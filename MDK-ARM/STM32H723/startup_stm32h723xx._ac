@@ -1,0 +1,7 @@
+--target=arm-arm-none-eabi -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard -masm=auto  -Wa,armasm,--diag_suppress=A1950W -c
+-gdwarf-4 -Wa,armasm,--pd,"__MICROLIB SETA 1"
+-I./RTE/_STM32H723
+-IE:/Keil5_pack/ARM/CMSIS/6.3.0/CMSIS/Core/Include
+-IE:/Keil5_pack/Keil/STM32H7xx_DFP/3.0.0/Drivers/CMSIS/Device/ST/STM32H7xx/Include
+-Wa,armasm,--pd,"__UVISION_VERSION SETA 543" -Wa,armasm,--pd,"STM32H723xx SETA 1" -Wa,armasm,--pd,"_RTE_ SETA 1"
+-o stm32h723/startup_stm32h723xx.o "startup_stm32h723xx.s"

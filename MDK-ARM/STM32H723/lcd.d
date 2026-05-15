@@ -1,5 +1,4 @@
-stm32h723/dcmi_ov2640.o: ..\Drivers\User\Src\dcmi_ov2640.c \
-  ..\Drivers\User\Inc\dcmi_ov2640.h \
+stm32h723/lcd.o: ..\LCD\lcd.c ..\LCD\lcd.h ..\Core\Inc\main.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal.h \
   ..\Core\Inc\stm32h7xx_hal_conf.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_rcc.h \
@@ -29,5 +28,4 @@ stm32h723/dcmi_ov2640.o: ..\Drivers\User\Src\dcmi_ov2640.c \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_spi_ex.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart_ex.h \
-  ..\Drivers\User\Inc\sccb.h ..\Drivers\User\Inc\usart.h \
-  ..\Core\Inc\main.h LCD\lcd.h ..\Drivers\User\Inc\dcmi_ov2640_cfg.h
+  ..\LCD\lcd_spi.h

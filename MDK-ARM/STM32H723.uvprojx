@@ -59,7 +59,7 @@
           <ListingPath></ListingPath>
           <HexFormatSelection>1</HexFormatSelection>
           <Merge32K>0</Merge32K>
-          <CreateBatchFile>0</CreateBatchFile>
+          <CreateBatchFile>1</CreateBatchFile>
           <BeforeCompile>
             <RunUserProg1>0</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
@@ -341,7 +341,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32H723xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;.\LCD</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -424,16 +424,6 @@
               <FileName>usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\User\Src\usart.c</FilePath>
-            </File>
-            <File>
-              <FileName>lcd_fonts.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\User\Src\lcd_fonts.c</FilePath>
-            </File>
-            <File>
-              <FileName>lcd_spi_154.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\User\Src\lcd_spi_154.c</FilePath>
             </File>
             <File>
               <FileName>sccb.c</FileName>
@@ -578,6 +568,21 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>LCD</GroupName>
+          <Files>
+            <File>
+              <FileName>lcd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\LCD\lcd.c</FilePath>
+            </File>
+            <File>
+              <FileName>lcd_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\LCD\lcd_spi.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
@@ -596,5 +601,14 @@
     </components>
     <files/>
   </RTE>
+
+  <LayerInfo>
+    <Layers>
+      <Layer>
+        <LayName>STM32H723</LayName>
+        <LayPrjMark>1</LayPrjMark>
+      </Layer>
+    </Layers>
+  </LayerInfo>
 
 </Project>
