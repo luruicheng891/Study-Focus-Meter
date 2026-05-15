@@ -33,7 +33,7 @@ STM32H723ZGT6 平台，OV2640 通过 DCMI 采集图像，SPI1 驱动 ILI9341 LCD
 | CS | PD0 | GPIO 输出 |
 | DC/RS | PD1 | GPIO 输出 |
 | RST | PD2 | GPIO 输出 |
-| LED | PD3 | GPIO 输出 (背光) |
+| LED | PB4 | GPIO 输出 (背光) |
 | VCC | 3.3V | |
 | GND | GND | |
 

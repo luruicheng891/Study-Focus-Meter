@@ -158,20 +158,19 @@ void LCD_Fill(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint
 
 /**
  * @brief  Write a RGB565 pixel buffer to a rectangular area
- * @note   Uses bulk SPI transfer for speed. Keeps CS low throughout the entire
- *         window-set + data-write sequence to avoid tearing/flicker.
+ * @note   Keeps CS low throughout entire transfer.
  */
 void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t *pBuf)
 {
     uint32_t total = (uint32_t)(xEnd - xStar + 1) * (yEnd - yStar + 1);
     uint32_t i;
-    uint8_t txBuf[512];  // 256 pixels per batch
+    uint8_t txBuf[512];
     uint32_t sent = 0;
 
-    // 手动设置窗口，全程保持CS低电平，避免中间释放CS导致闪烁
+    // 全程保持CS低电平
     LCD_CS_CLR();
 
-    // 发送列地址设置命令 (0x2A)
+    // 列地址设置 (0x2A)
     LCD_DC_CLR();
     LCD_SPI_SendByte(lcddev.setxcmd);
     LCD_DC_SET();
@@ -180,7 +179,7 @@ void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd
     LCD_SPI_SendByte(xEnd >> 8);
     LCD_SPI_SendByte(xEnd & 0xFF);
 
-    // 发送行地址设置命令 (0x2B)
+    // 行地址设置 (0x2B)
     LCD_DC_CLR();
     LCD_SPI_SendByte(lcddev.setycmd);
     LCD_DC_SET();
@@ -189,7 +188,7 @@ void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd
     LCD_SPI_SendByte(yEnd >> 8);
     LCD_SPI_SendByte(yEnd & 0xFF);
 
-    // 发送写GRAM命令 (0x2C)
+    // 写GRAM命令 (0x2C)
     LCD_DC_CLR();
     LCD_SPI_SendByte(lcddev.wramcmd);
     LCD_DC_SET();
@@ -357,15 +356,23 @@ static void LCD_GPIO_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    /* Enable GPIOD clock */
+    /* Enable GPIOD and GPIOB clock */
     __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    /* Configure PD0 (CS), PD1 (DC), PD2 (RST), PD3 (LED) */
-    GPIO_InitStruct.Pin   = LCD_CS_PIN | LCD_DC_PIN | LCD_RST_PIN | LCD_LED_PIN;
+    /* Configure PD0 (CS), PD1 (DC), PD2 (RST) */
+    GPIO_InitStruct.Pin   = LCD_CS_PIN | LCD_DC_PIN | LCD_RST_PIN;
     GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull  = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    /* Configure PB4 (LED backlight) */
+    GPIO_InitStruct.Pin   = LCD_LED_PIN;
+    GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull  = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LCD_LED_PORT, &GPIO_InitStruct);
 
     /* Default states */
     LCD_CS_SET();

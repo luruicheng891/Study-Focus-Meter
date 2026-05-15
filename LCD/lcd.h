@@ -55,8 +55,8 @@ extern uint16_t BACK_COLOR;
 #define LCD_RST_PORT    GPIOD
 #define LCD_RST_PIN     GPIO_PIN_2
 
-#define LCD_LED_PORT    GPIOD
-#define LCD_LED_PIN     GPIO_PIN_3
+#define LCD_LED_PORT    GPIOB
+#define LCD_LED_PIN     GPIO_PIN_4
 
 /* -------- GPIO Control Macros -------- */
 #define LCD_CS_SET()    HAL_GPIO_WritePin(LCD_CS_PORT,  LCD_CS_PIN,  GPIO_PIN_SET)
