@@ -41,7 +41,7 @@ void LCD_SPI_Init(void)
     hlcd_spi.Init.CLKPolarity       = SPI_POLARITY_LOW;
     hlcd_spi.Init.CLKPhase          = SPI_PHASE_1EDGE;
     hlcd_spi.Init.NSS               = SPI_NSS_SOFT;
-    hlcd_spi.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+    hlcd_spi.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
     hlcd_spi.Init.FirstBit          = SPI_FIRSTBIT_MSB;
     hlcd_spi.Init.TIMode            = SPI_TIMODE_DISABLE;
     hlcd_spi.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
