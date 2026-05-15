@@ -5,8 +5,6 @@
 "stm32h723\stm32h7xx_hal_msp.o"
 "stm32h723\led.o"
 "stm32h723\usart.o"
-"stm32h723\lcd_fonts.o"
-"stm32h723\lcd_spi_154.o"
 "stm32h723\sccb.o"
 "stm32h723\dcmi_ov2640.o"
 "stm32h723\stm32h7xx_hal_cortex.o"
@@ -33,6 +31,8 @@
 "stm32h723\stm32h7xx_hal_uart.o"
 "stm32h723\stm32h7xx_hal_uart_ex.o"
 "stm32h723\system_stm32h7xx.o"
+"stm32h723\lcd.o"
+"stm32h723\lcd_spi.o"
 --library_type=microlib --strict --scatter "STM32H723\STM32H723.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers

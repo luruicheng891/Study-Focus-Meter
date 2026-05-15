@@ -28,6 +28,5 @@ stm32h723/main.o: ..\Core\Src\main.c ..\Core\Inc\main.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_spi_ex.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart_ex.h \
-  ..\Drivers\User\Inc\led.h ..\Drivers\User\Inc\usart.h \
-  ..\Drivers\User\Inc\lcd_spi_154.h ..\Drivers\User\Inc\lcd_fonts.h \
+  ..\Drivers\User\Inc\led.h ..\Drivers\User\Inc\usart.h LCD\lcd.h \
   ..\Drivers\User\Inc\dcmi_ov2640.h ..\Drivers\User\Inc\sccb.h
