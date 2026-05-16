@@ -12,6 +12,7 @@
 #include "usart.h"
 #include "lcd.h"
 #include "dcmi_ov2640.h"
+#include "FreeRTOS.h"
 
 #define Camera_Buffer	0x24000000    // 摄像头图像缓冲区
 
@@ -39,7 +40,8 @@ int main(void)
 	DCMI_OV2640_Init();     // DCMI以及OV2640初始化
 
 	OV2640_DMA_Transmit_Continuous(Camera_Buffer, OV2640_BufferSize);  // 启动DMA连续采集
-
+	/*开启Freertos的任务调度*/
+	vTaskStartScheduler();
 	while (1)
 	{
 		if (DCMI_FrameState == 1)   // 采集到新一帧图像

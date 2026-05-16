@@ -1,32 +1,52 @@
-stm32h723/main.o: ..\Core\Src\main.c ..\Core\Inc\main.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal.h \
-  ..\Core\Inc\stm32h7xx_hal_conf.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_rcc.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_def.h \
-  ..\Drivers\CMSIS\Device\ST\STM32H7xx\Include\stm32h7xx.h \
-  ..\Drivers\CMSIS\Device\ST\STM32H7xx\Include\stm32h723xx.h \
-  ..\Drivers\CMSIS\Include\core_cm7.h \
-  ..\Drivers\CMSIS\Device\ST\STM32H7xx\Include\system_stm32h7xx.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\Legacy\stm32_hal_legacy.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_rcc_ex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_gpio.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_gpio_ex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_dma.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_dma_ex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_mdma.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_dcmi.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_exti.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_cortex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_flash.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_flash_ex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_hsem.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_i2c.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_i2c_ex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_pwr.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_pwr_ex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_spi.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_spi_ex.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart_ex.h \
-  ..\Drivers\User\Inc\led.h ..\Drivers\User\Inc\usart.h LCD\lcd.h \
-  ..\Drivers\User\Inc\dcmi_ov2640.h ..\Drivers\User\Inc\sccb.h
+.\stm32h723\main.o: ../Core/Src/main.c
+.\stm32h723\main.o: ../Core/Inc/main.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
+.\stm32h723\main.o: ../Core/Inc/stm32h7xx_hal_conf.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rcc.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_def.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Include/core_cm7.h
+.\stm32h723\main.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdint.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Include/cmsis_version.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Include/cmsis_compiler.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Include/cmsis_armcc.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Include/mpu_armv7.h
+.\stm32h723\main.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/system_stm32h7xx.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h
+.\stm32h723\main.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stddef.h
+.\stm32h723\main.o: D:\Keil5\ARM\ARMCC\Bin\..\include\math.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rcc_ex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio_ex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dma.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dma_ex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_mdma.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_dcmi.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_exti.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_cortex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_flash.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_flash_ex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hsem.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c_ex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr_ex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi_ex.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
+.\stm32h723\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+.\stm32h723\main.o: ..\Drivers\User\Inc\led.h
+.\stm32h723\main.o: ..\Drivers\User\Inc\usart.h
+.\stm32h723\main.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
+.\stm32h723\main.o: .\LCD\lcd.h
+.\stm32h723\main.o: ..\Drivers\User\Inc\dcmi_ov2640.h
+.\stm32h723\main.o: ..\Drivers\User\Inc\sccb.h
+.\stm32h723\main.o: ..\Freertos\include\FreeRTOS.h
+.\stm32h723\main.o: ../Core/Inc/FreeRTOSConfig.h
+.\stm32h723\main.o: ..\Freertos\include\projdefs.h
+.\stm32h723\main.o: ..\Freertos\include\portable.h
+.\stm32h723\main.o: ..\Freertos\include\deprecated_definitions.h
+.\stm32h723\main.o: ..\Freertos\portable\RVDS\ARM_CM4F\portmacro.h
+.\stm32h723\main.o: ..\Freertos\include\mpu_wrappers.h
