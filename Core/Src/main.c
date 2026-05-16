@@ -14,7 +14,7 @@
 #include "dcmi_ov2640.h"
 #include "FreeRTOS.h"
 
-#define Camera_Buffer	0x24000000    // 摄像头图像缓冲区
+
 
 /********************************************** 函数声明 *******************************************/
 
@@ -32,27 +32,13 @@ int main(void)
 	SCB_EnableDCache();
 	HAL_Init();
 	SystemClock_Config();
-	LED_Init();
-	USART1_Init();
-
-	LCD_Init();             // ILI9341 LCD初始化 (SPI1: PB3-SCK, PB5-MOSI)
-
-	DCMI_OV2640_Init();     // DCMI以及OV2640初始化
-
-	OV2640_DMA_Transmit_Continuous(Camera_Buffer, OV2640_BufferSize);  // 启动DMA连续采集
+	MX_FREERTOS_Init();
+	
 	/*开启Freertos的任务调度*/
 	vTaskStartScheduler();
 	while (1)
 	{
-		if (DCMI_FrameState == 1)   // 采集到新一帧图像
-		{
-			DCMI_FrameState = 0;
-
-			// 使DCache无效，确保CPU读到DMA写入的最新数据
-			SCB_InvalidateDCache_by_Addr((uint32_t *)Camera_Buffer, Display_Width * Display_Height * 2);
-			// 将摄像头图像刷到LCD
-			LCD_DrawBuffer(0, 0, Display_Width - 1, Display_Height - 1, (uint16_t *)Camera_Buffer);
-		}
+		
 	}
 }
 

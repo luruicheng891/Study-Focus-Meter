@@ -48,4 +48,5 @@ SET CPU_CLOCK=0x017D7840
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\port.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\heap_4.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\cmsis_os2.__i"
+"D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\camera.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmLink" --Via ".\STM32H723\STM32H723.lnp"

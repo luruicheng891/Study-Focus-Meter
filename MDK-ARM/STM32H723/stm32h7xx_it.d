@@ -38,3 +38,12 @@
 .\stm32h723\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 .\stm32h723\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
 .\stm32h723\stm32h7xx_it.o: ../Core/Inc/stm32h7xx_it.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\include\FreeRTOS.h
+.\stm32h723\stm32h7xx_it.o: ../Core/Inc/FreeRTOSConfig.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\include\projdefs.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\include\portable.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\include\deprecated_definitions.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\portable\RVDS\ARM_CM4F\portmacro.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\include\mpu_wrappers.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\include\task.h
+.\stm32h723\stm32h7xx_it.o: ..\Freertos\include\list.h

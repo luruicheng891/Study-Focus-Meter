@@ -48,3 +48,4 @@
 .\stm32h723\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
 .\stm32h723\freertos.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os.h
 .\stm32h723\freertos.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os2.h
+.\stm32h723\freertos.o: ..\Task\Camera.h
