@@ -1,0 +1,15 @@
+.\stm32h723\queue.o: ..\Freertos\queue.c
+.\stm32h723\queue.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdlib.h
+.\stm32h723\queue.o: D:\Keil5\ARM\ARMCC\Bin\..\include\string.h
+.\stm32h723\queue.o: ..\Freertos\include\FreeRTOS.h
+.\stm32h723\queue.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stddef.h
+.\stm32h723\queue.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdint.h
+.\stm32h723\queue.o: ../Core/Inc/FreeRTOSConfig.h
+.\stm32h723\queue.o: ..\Freertos\include\projdefs.h
+.\stm32h723\queue.o: ..\Freertos\include\portable.h
+.\stm32h723\queue.o: ..\Freertos\include\deprecated_definitions.h
+.\stm32h723\queue.o: ..\Freertos\portable\RVDS\ARM_CM4F\portmacro.h
+.\stm32h723\queue.o: ..\Freertos\include\mpu_wrappers.h
+.\stm32h723\queue.o: ..\Freertos\include\task.h
+.\stm32h723\queue.o: ..\Freertos\include\list.h
+.\stm32h723\queue.o: ..\Freertos\include\queue.h
