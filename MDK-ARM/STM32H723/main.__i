@@ -1,4 +1,4 @@
---c99 -c --cpu Cortex-M7.fp.dp -D__MICROLIB -g -O1 --apcs=interwork --split_sections -I../Core/Inc -I../Drivers/STM32H7xx_HAL_Driver/Inc -I../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I../Drivers/CMSIS/Include -I..\Drivers\User\Inc -I.\LCD -I..\Freertos -I..\Freertos\CMSIS_RTOS_V2 -I..\Freertos\include -I..\Freertos\portable\MemMang -I..\Freertos\portable\RVDS\ARM_CM4F -I..\Task
+--c99 -c --cpu Cortex-M7.fp.dp -D__MICROLIB -g -O1 --apcs=interwork --split_sections -I../Core/Inc -I../Drivers/STM32H7xx_HAL_Driver/Inc -I../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I../Drivers/CMSIS/Include -I..\Drivers\User\Inc -I.\LCD -I..\Freertos -I..\Freertos\CMSIS_RTOS_V2 -I..\Freertos\include -I..\Freertos\portable\MemMang -I..\Freertos\portable\RVDS\ARM_CM4F -I..\LVGL -I..\LVGL\src -I..\Task
 -I E:\Desktop\OV2640_Deno\MDK-ARM\RTE
 -I D:\Keil5\ARM\PACK\ARM\CMSIS\4.2.0\CMSIS\Include
 -I D:\Keil5\ARM\PACK\Keil\STM32H7xx_DFP\3.1.1
