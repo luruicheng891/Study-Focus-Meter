@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32H723xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;.\LCD;..\Freertos;..\Freertos\CMSIS_RTOS_V2;..\Freertos\include;..\Freertos\portable\MemMang;..\Freertos\portable\RVDS\ARM_CM4F;..\LVGL;..\LVGL\src;..\Task</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;.\LCD;..\Freertos;..\Freertos\CMSIS_RTOS_V2;..\Freertos\include;..\Freertos\portable\MemMang;..\Freertos\portable\RVDS\ARM_CM4F;..\LVGL;..\LVGL\src;..\Task;..\CJSON</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -673,6 +673,11 @@
               <FileType>1</FileType>
               <FilePath>..\Task\Camera.c</FilePath>
             </File>
+            <File>
+              <FileName>WeatherTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\WeatherTask.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -687,6 +692,16 @@
               <FileName>MPU6050.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Communication\MPU6050.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>CJSON</GroupName>
+          <Files>
+            <File>
+              <FileName>cJSON.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\CJSON\cJSON.c</FilePath>
             </File>
           </Files>
         </Group>

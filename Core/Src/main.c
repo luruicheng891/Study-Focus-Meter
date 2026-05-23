@@ -13,6 +13,27 @@
 #include "lcd.h"
 #include "dcmi_ov2640.h"
 #include "FreeRTOS.h"
+#include "cJSON.h"
+
+/*cJSON内存适配FreeRTOS*/
+static void* cjson_malloc(size_t size) {
+    return pvPortMalloc(size);
+}
+
+static void cjson_free(void *ptr) {
+    vPortFree(ptr);
+}
+
+
+
+void CJSON_Init(void)
+{
+// 替换cJSON内存分配为FreeRTOS heap_4
+	cJSON_Hooks hooks;
+	hooks.malloc_fn = cjson_malloc;
+	hooks.free_fn = cjson_free;
+	cJSON_InitHooks(&hooks);	
+}
 
 
 
@@ -31,11 +52,18 @@ int main(void)
 	SCB_EnableICache();
 	SCB_EnableDCache();
 	HAL_Init();
+	
 	SystemClock_Config();
+	//USART1_Init();
+	CJSON_Init();
+	
 	MX_FREERTOS_Init();
+
 	
 	/*开启Freertos的任务调度*/
 	vTaskStartScheduler();
+	
+	
 	while (1)
 	{
 		

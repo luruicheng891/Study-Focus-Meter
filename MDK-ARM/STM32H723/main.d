@@ -50,3 +50,4 @@
 .\stm32h723\main.o: ..\Freertos\include\deprecated_definitions.h
 .\stm32h723\main.o: ..\Freertos\portable\RVDS\ARM_CM4F\portmacro.h
 .\stm32h723\main.o: ..\Freertos\include\mpu_wrappers.h
+.\stm32h723\main.o: ..\CJSON\cJSON.h

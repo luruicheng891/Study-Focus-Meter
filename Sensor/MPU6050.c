@@ -1,6 +1,6 @@
 #include "MPU6050.h"
 #include "MPU6050_Reg.h"
-#include "i2c.h"  // 注意：你的I2C头文件名是i2c.h，不是i2c_sim.h
+#include "I2C.h"  
 
 // 写寄存器
 // 返回值: 0=成功, 非0=失败

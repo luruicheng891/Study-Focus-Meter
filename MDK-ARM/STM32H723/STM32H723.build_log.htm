@@ -21,25 +21,27 @@ Target DLL:      STLink\ST-LINKIII-KEIL_SWO.dll V2.0.14.0_KEIL
 Dialog DLL:      TCM.DLL V1.14.4.0
  
 <h2>Project:</h2>
-E:\Desktop\OV2640_Deno\MDK-ARM\STM32H723.uvprojx
-Project File Date:  05/20/2026
+E:\Desktop\AIÑ§Ï°×´Ì¬¼à²âÒÇ·ÖÎö\MDK-ARM\STM32H723.uvprojx
+Project File Date:  05/21/2026
 
 <h2>Output:</h2>
 *** Note: Rebuilding project, since 'Options->Output->Create Batch File' is selected.
 Rebuild target 'STM32H723'
 assembling startup_stm32h723xx.s...
 compiling main.c...
-../Core/Src/main.c(35): warning:  #223-D: function "MX_FREERTOS_Init" declared implicitly
+../Core/Src/main.c(60): warning:  #223-D: function "MX_FREERTOS_Init" declared implicitly
         MX_FREERTOS_Init();
-../Core/Src/main.c(38): warning:  #223-D: function "vTaskStartScheduler" declared implicitly
+../Core/Src/main.c(64): warning:  #223-D: function "vTaskStartScheduler" declared implicitly
         vTaskStartScheduler();
 ../Core/Src/main.c: 2 warnings, 0 errors
 compiling stm32h7xx_it.c...
 compiling stm32h7xx_hal_msp.c...
 compiling freertos.c...
-..\Core\Src\freertos.c(98): warning:  #167-D: argument of type "void (*)(void)" is incompatible with parameter of type "TaskFunction_t"
+..\Task\SensorTask.h(7): warning:  #1-D: last line of file ends without a newline
+  #endif
+..\Core\Src\freertos.c(99): warning:  #167-D: argument of type "void (*)(void)" is incompatible with parameter of type "TaskFunction_t"
                 xTaskCreate(Camera_task, "Camera_task", 1024, NULL, osPriorityNormal, NULL);
-..\Core\Src\freertos.c: 1 warning, 0 errors
+..\Core\Src\freertos.c: 2 warnings, 0 errors
 compiling led.c...
 compiling usart.c...
 compiling sccb.c...
@@ -81,19 +83,38 @@ compiling port.c...
 compiling heap_4.c...
 compiling cmsis_os2.c...
 compiling Camera.c...
+..\Task\Camera.c(29): warning:  #1-D: last line of file ends without a newline
+  }
+..\Task\Camera.c: 1 warning, 0 errors
+compiling WeatherTask.c...
+compiling SensorTask.c...
+..\Sensor\AHT20.h(26): warning:  #1-D: last line of file ends without a newline
+  #endif
+..\Task\SensorTask.c(52): warning:  #1-D: last line of file ends without a newline
+  }
+..\Task\SensorTask.c: 2 warnings, 0 errors
 compiling I2C.c...
 ..\Communication\I2C.h(32): warning:  #1-D: last line of file ends without a newline
   #endif
 ..\Communication\I2C.c: 1 warning, 0 errors
-compiling MPU6050.c...
-..\Communication\i2c.h(32): warning:  #1-D: last line of file ends without a newline
+compiling cJSON.c...
+compiling AHT20.c...
+..\Sensor\AHT20.h(26): warning:  #1-D: last line of file ends without a newline
   #endif
-..\Communication\MPU6050.c(136): warning:  #1-D: last line of file ends without a newline
+..\Communication\I2C.h(32): warning:  #1-D: last line of file ends without a newline
+  #endif
+..\Sensor\AHT20.c(153): warning:  #1-D: last line of file ends without a newline
   }
-..\Communication\MPU6050.c: 2 warnings, 0 errors
+..\Sensor\AHT20.c: 3 warnings, 0 errors
+compiling MPU6050.c...
+..\Communication\I2C.h(32): warning:  #1-D: last line of file ends without a newline
+  #endif
+..\Sensor\MPU6050.c(136): warning:  #1-D: last line of file ends without a newline
+  }
+..\Sensor\MPU6050.c: 2 warnings, 0 errors
 linking...
-Program Size: Code=28000 RO-data=1152 RW-data=2208 ZI-data=20408  
-".\STM32H723\STM32H723.axf" - 0 Error(s), 6 Warning(s).
+Program Size: Code=32700 RO-data=1152 RW-data=2240 ZI-data=20920  
+".\STM32H723\STM32H723.axf" - 0 Error(s), 13 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -104,7 +125,7 @@ Package Vendor: ARM
    * Component: CORE Version: 3.40.0
 
 <h2>Collection of Component include folders:</h2>
-  E:\Desktop\OV2640_Deno\MDK-ARM\RTE
+  E:\Desktop\AIÑ§Ï°×´Ì¬¼à²âÒÇ·ÖÎö\MDK-ARM\RTE
   D:\Keil5\ARM\PACK\ARM\CMSIS\4.2.0\CMSIS\Include
   D:\Keil5\ARM\PACK\Keil\STM32H7xx_DFP\3.1.1
 

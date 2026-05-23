@@ -6,7 +6,7 @@
 
 /*-------------------------------------------- USART���ú� ---------------------------------------*/
 
-#define  USART1_BaudRate  921600
+#define  USART1_BaudRate  115200
 
 #define  USART1_TX_PIN									GPIO_PIN_9								// TX 引脚
 #define	USART1_TX_PORT									GPIOA										// TX 引脚端口

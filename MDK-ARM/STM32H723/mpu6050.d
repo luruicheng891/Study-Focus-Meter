@@ -1,8 +1,8 @@
-.\stm32h723\mpu6050.o: ..\Communication\MPU6050.c
-.\stm32h723\mpu6050.o: ..\Communication\MPU6050.h
+.\stm32h723\mpu6050.o: ..\Sensor\MPU6050.c
+.\stm32h723\mpu6050.o: ..\Sensor\MPU6050.h
 .\stm32h723\mpu6050.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdint.h
-.\stm32h723\mpu6050.o: ..\Communication\MPU6050_Reg.h
-.\stm32h723\mpu6050.o: ..\Communication\i2c.h
+.\stm32h723\mpu6050.o: ..\Sensor\MPU6050_Reg.h
+.\stm32h723\mpu6050.o: ..\Communication\I2C.h
 .\stm32h723\mpu6050.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
 .\stm32h723\mpu6050.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h
 .\stm32h723\mpu6050.o: ../Drivers/CMSIS/Include/core_cm7.h
