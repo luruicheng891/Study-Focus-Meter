@@ -45,5 +45,11 @@
 ".\stm32h723\heap_4.o"
 ".\stm32h723\cmsis_os2.o"
 ".\stm32h723\camera.o"
+".\stm32h723\weathertask.o"
+".\stm32h723\sensortask.o"
+".\stm32h723\i2c.o"
+".\stm32h723\cjson_1.o"
+".\stm32h723\aht20.o"
+".\stm32h723\mpu6050.o"
 --library_type=microlib --strict --scatter ".\STM32H723\STM32H723.sct"
 --summary_stderr --info summarysizes -o .\STM32H723\STM32H723.axf

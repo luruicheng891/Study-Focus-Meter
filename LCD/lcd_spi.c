@@ -1,28 +1,35 @@
 /**
  * @file    lcd_spi.c
- * @brief   SPI1 hardware initialization for ILI9341 LCD on STM32H723ZGT6
+ * @brief   SPI1 + DMA hardware initialization for ILI9341 LCD on STM32H723ZGT6
  *
  * SPI1 Pin Mapping (no conflict with DCMI):
  *   SCK  -> PB3  (AF5)
  *   MOSI -> PB5  (AF5)
  *   (MISO not needed - LCD is write-only)
  *
+ * DMA Configuration:
+ *   DMA1_Stream0 -> SPI1_TX (via DMAMUX, request = DMA_REQUEST_SPI1_TX)
+ *   Direction: Memory -> Peripheral
+ *   Mode: Normal (single shot per transfer)
+ *
  * STM32H723 SPI1 is on APB2 bus, clock = 137.5MHz.
- * Prescaler=4 gives SPI clock ~34MHz (ILI9341 max write speed ~40MHz).
+ * Prescaler=8 gives SPI clock ~17.2MHz.
  */
 
 #include "lcd_spi.h"
 
 SPI_HandleTypeDef hlcd_spi;
+DMA_HandleTypeDef hdma_spi1_tx;
 
 /**
- * @brief  Initialize SPI1 peripheral and GPIO for LCD
+ * @brief  Initialize SPI1 peripheral, GPIO, and TX DMA for LCD
  */
 void LCD_SPI_Init(void)
 {
     /* Enable clocks */
     __HAL_RCC_SPI1_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_DMA1_CLK_ENABLE();
 
     /* Configure PB3 (SCK), PB5 (MOSI) as SPI1 Alternate Function */
     GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -33,7 +40,35 @@ void LCD_SPI_Init(void)
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* SPI1 configuration - transmit only */
+    /* ---- DMA1 Stream0 for SPI1_TX ---- */
+    hdma_spi1_tx.Instance                 = DMA1_Stream0;
+    hdma_spi1_tx.Init.Request             = DMA_REQUEST_SPI1_TX;
+    hdma_spi1_tx.Init.Direction           = DMA_MEMORY_TO_PERIPH;
+    hdma_spi1_tx.Init.PeriphInc           = DMA_PINC_DISABLE;
+    hdma_spi1_tx.Init.MemInc              = DMA_MINC_ENABLE;
+    hdma_spi1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_spi1_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+    hdma_spi1_tx.Init.Mode                = DMA_NORMAL;
+    hdma_spi1_tx.Init.Priority            = DMA_PRIORITY_HIGH;
+    hdma_spi1_tx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;
+
+    if (HAL_DMA_Init(&hdma_spi1_tx) != HAL_OK)
+    {
+        while (1) {}
+    }
+
+    /* Link DMA handle to SPI TX */
+    __HAL_LINKDMA(&hlcd_spi, hdmatx, hdma_spi1_tx);
+
+    /* DMA1_Stream0 interrupt - medium priority (lower than DCMI DMA) */
+    HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+
+    /* SPI1 interrupt for error handling */
+    HAL_NVIC_SetPriority(SPI1_IRQn, 1, 1);
+    HAL_NVIC_EnableIRQ(SPI1_IRQn);
+
+    /* ---- SPI1 configuration - transmit only ---- */
     hlcd_spi.Instance               = SPI1;
     hlcd_spi.Init.Mode              = SPI_MODE_MASTER;
     hlcd_spi.Init.Direction         = SPI_DIRECTION_2LINES_TXONLY;

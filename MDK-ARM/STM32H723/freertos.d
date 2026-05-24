@@ -49,3 +49,4 @@
 .\stm32h723\freertos.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os.h
 .\stm32h723\freertos.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os2.h
 .\stm32h723\freertos.o: ..\Task\Camera.h
+.\stm32h723\freertos.o: ..\Task\SensorTask.h

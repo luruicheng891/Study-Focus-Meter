@@ -110,5 +110,6 @@ void Lcd_WriteData_16Bit(uint16_t Data);
 void LCD_direction(uint8_t direction);
 void LCD_Fill(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t color);
 void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t *pBuf);
+void LCD_WriteDataBuffer(uint16_t *pBuf, uint32_t pixel_count);
 
 #endif /* __LCD_H */

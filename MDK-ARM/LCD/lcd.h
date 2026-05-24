@@ -55,8 +55,8 @@ extern uint16_t BACK_COLOR;
 #define LCD_RST_PORT    GPIOD
 #define LCD_RST_PIN     GPIO_PIN_2
 
-#define LCD_LED_PORT    GPIOD
-#define LCD_LED_PIN     GPIO_PIN_3
+#define LCD_LED_PORT    GPIOB
+#define LCD_LED_PIN     GPIO_PIN_4
 
 /* -------- GPIO Control Macros -------- */
 #define LCD_CS_SET()    HAL_GPIO_WritePin(LCD_CS_PORT,  LCD_CS_PIN,  GPIO_PIN_SET)
@@ -109,15 +109,7 @@ void LCD_WriteRAM_Prepare(void);
 void Lcd_WriteData_16Bit(uint16_t Data);
 void LCD_direction(uint8_t direction);
 void LCD_Fill(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t color);
-
-/**
- * @brief  Write a RGB565 pixel buffer to a rectangular area
- * @param  xStar: start X
- * @param  yStar: start Y
- * @param  xEnd:  end X
- * @param  yEnd:  end Y
- * @param  pBuf:  pointer to RGB565 pixel data (big-endian byte order from camera)
- */
 void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t *pBuf);
+void LCD_WriteDataBuffer(uint16_t *pBuf, uint32_t pixel_count);
 
 #endif /* __LCD_H */

@@ -1,18 +1,18 @@
 /**
  * @file    lcd.c
- * @brief   ILI9341 LCD driver for STM32H723ZGT6 (HAL + Hardware SPI4)
- * @note    Ported from QDtech STM32F407 SPI driver
+ * @brief   ILI9341 LCD driver for STM32H723ZGT6 (HAL + SPI1 + DMA)
  *
- * SPI4 Pins:
- *   SCK  -> PE2
- *   MISO -> PE5
- *   MOSI -> PE6
+ * SPI1 Pins:
+ *   SCK  -> PB3
+ *   MOSI -> PB5
  *
  * Control Pins (GPIO Output):
  *   CS   -> PD0
  *   DC   -> PD1
  *   RST  -> PD2
- *   LED  -> PD3
+ *   LED  -> PB4
+ *
+ * DMA: DMA1_Stream0 for SPI1_TX bulk pixel transfers
  */
 
 #include "lcd.h"
@@ -27,6 +27,19 @@ LCD_Dev_t lcddev;
 /* Default colors */
 uint16_t POINT_COLOR = 0x0000;  /* Black */
 uint16_t BACK_COLOR  = 0xFFFF;  /* White */
+
+/* ---- DMA transfer state ---- */
+static volatile uint8_t lcd_dma_busy = 0;  /* 1 = DMA transfer in progress */
+
+/* DMA double buffer for pixel byte-swap
+ * MUST be in DMA-accessible memory (AXI SRAM, not DTCM!)
+ * STM32H7: DTCM (0x20000000) is NOT accessible by DMA1/DMA2
+ * Place in AXI SRAM (0x24000000) using __attribute__((section))
+ * Camera buffer uses 0x24000000~0x2401C200, we use 0x24040000
+ */
+#define LCD_DMA_BUF_SIZE  1024  /* bytes (512 pixels * 2 bytes) */
+static uint8_t lcd_dma_buf[2][LCD_DMA_BUF_SIZE] __attribute__((section(".ARM.__at_0x24040000"), aligned(32)));
+static uint8_t lcd_dma_buf_idx = 0;  /* ping-pong index */
 
 /* ======================== Low-level SPI Transmit ======================== */
 
@@ -47,6 +60,63 @@ static void LCD_SPI_SendByte(uint8_t byte)
 static void LCD_SPI_SendBytes(uint8_t *buf, uint16_t len)
 {
     HAL_SPI_Transmit(&hlcd_spi, buf, len, HAL_MAX_DELAY);
+}
+
+/* ======================== DMA Helper Functions ======================== */
+
+/**
+ * @brief  Wait for ongoing DMA transfer to complete (with timeout)
+ */
+static void LCD_DMA_Wait(void)
+{
+    volatile uint32_t timeout = 0xFFFFFF;  /* ~16M iterations, safety timeout */
+    while (lcd_dma_busy && (--timeout > 0))
+    {
+        /* Could yield to RTOS here if needed */
+    }
+    if (timeout == 0)
+    {
+        /* DMA transfer timed out - force reset */
+        HAL_SPI_Abort(&hlcd_spi);
+        lcd_dma_busy = 0;
+    }
+}
+
+/**
+ * @brief  Send buffer via SPI DMA (non-blocking)
+ * @param  buf: pointer to data (must remain valid until transfer completes)
+ * @param  len: number of bytes
+ */
+static void LCD_SPI_SendBytes_DMA(uint8_t *buf, uint16_t len)
+{
+    lcd_dma_busy = 1;
+
+    /* Ensure DCache is flushed so DMA reads correct data */
+    SCB_CleanDCache_by_Addr((uint32_t *)((uint32_t)buf & ~31U), (int32_t)(len + 31));
+
+    HAL_SPI_Transmit_DMA(&hlcd_spi, buf, len);
+}
+
+/**
+ * @brief  HAL SPI TX Complete callback - called from DMA ISR
+ */
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi->Instance == SPI1)
+    {
+        lcd_dma_busy = 0;
+    }
+}
+
+/**
+ * @brief  HAL SPI Error callback - called on DMA/SPI errors
+ */
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi->Instance == SPI1)
+    {
+        lcd_dma_busy = 0;  /* Release busy flag so system doesn't hang */
+    }
 }
 
 /* ======================== LCD Command / Data ======================== */
@@ -122,17 +192,37 @@ void LCD_DrawPoint(uint16_t x, uint16_t y)
 void LCD_Clear(uint16_t Color)
 {
     uint32_t total = (uint32_t)lcddev.width * lcddev.height;
-    uint8_t buf[2];
-    buf[0] = Color >> 8;
-    buf[1] = Color & 0xFF;
+    uint32_t sent = 0;
+    uint32_t i;
 
     LCD_SetWindows(0, 0, lcddev.width - 1, lcddev.height - 1);
+
+    /* Fill DMA buffer with repeated color */
+    uint8_t hi = Color >> 8;
+    uint8_t lo = Color & 0xFF;
+    for (i = 0; i < LCD_DMA_BUF_SIZE; i += 2)
+    {
+        lcd_dma_buf[0][i]     = hi;
+        lcd_dma_buf[0][i + 1] = lo;
+    }
+
     LCD_CS_CLR();
     LCD_DC_SET();
-    for (uint32_t i = 0; i < total; i++)
+
+    while (sent < total)
     {
-        LCD_SPI_SendBytes(buf, 2);
+        uint32_t batch = total - sent;
+        uint32_t bytes;
+        if (batch > (LCD_DMA_BUF_SIZE / 2))
+            batch = (LCD_DMA_BUF_SIZE / 2);
+        bytes = batch * 2;
+
+        LCD_DMA_Wait();
+        LCD_SPI_SendBytes_DMA(lcd_dma_buf[0], (uint16_t)bytes);
+        sent += batch;
     }
+
+    LCD_DMA_Wait();
     LCD_CS_SET();
 }
 
@@ -142,35 +232,58 @@ void LCD_Clear(uint16_t Color)
 void LCD_Fill(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t color)
 {
     uint32_t total = (uint32_t)(xEnd - xStar + 1) * (yEnd - yStar + 1);
-    uint8_t buf[2];
-    buf[0] = color >> 8;
-    buf[1] = color & 0xFF;
+    uint32_t sent = 0;
+    uint32_t i;
 
     LCD_SetWindows(xStar, yStar, xEnd, yEnd);
+
+    /* Fill DMA buffer with repeated color */
+    uint8_t hi = color >> 8;
+    uint8_t lo = color & 0xFF;
+    for (i = 0; i < LCD_DMA_BUF_SIZE; i += 2)
+    {
+        lcd_dma_buf[0][i]     = hi;
+        lcd_dma_buf[0][i + 1] = lo;
+    }
+
     LCD_CS_CLR();
     LCD_DC_SET();
-    for (uint32_t i = 0; i < total; i++)
+
+    while (sent < total)
     {
-        LCD_SPI_SendBytes(buf, 2);
+        uint32_t batch = total - sent;
+        uint32_t bytes;
+        if (batch > (LCD_DMA_BUF_SIZE / 2))
+            batch = (LCD_DMA_BUF_SIZE / 2);
+        bytes = batch * 2;
+
+        LCD_DMA_Wait();
+        LCD_SPI_SendBytes_DMA(lcd_dma_buf[0], (uint16_t)bytes);
+        sent += batch;
     }
+
+    LCD_DMA_Wait();
     LCD_CS_SET();
 }
 
 /**
- * @brief  Write a RGB565 pixel buffer to a rectangular area
- * @note   Keeps CS low throughout entire transfer.
+ * @brief  Write a RGB565 pixel buffer to a rectangular area (DMA accelerated)
+ * @note   Uses ping-pong DMA buffers: while DMA sends one buffer,
+ *         CPU prepares the next buffer (byte-swap from uint16 to big-endian).
  */
 void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t *pBuf)
 {
     uint32_t total = (uint32_t)(xEnd - xStar + 1) * (yEnd - yStar + 1);
-    uint32_t i;
-    uint8_t txBuf[512];
     uint32_t sent = 0;
+    uint32_t i;
 
-    // 全程保持CS低电平
+    /* Ensure no previous DMA is running */
+    LCD_DMA_Wait();
+
+    /* Keep CS low for entire transfer */
     LCD_CS_CLR();
 
-    // 列地址设置 (0x2A)
+    /* Set window: column address (0x2A) */
     LCD_DC_CLR();
     LCD_SPI_SendByte(lcddev.setxcmd);
     LCD_DC_SET();
@@ -179,7 +292,7 @@ void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd
     LCD_SPI_SendByte(xEnd >> 8);
     LCD_SPI_SendByte(xEnd & 0xFF);
 
-    // 行地址设置 (0x2B)
+    /* Set window: row address (0x2B) */
     LCD_DC_CLR();
     LCD_SPI_SendByte(lcddev.setycmd);
     LCD_DC_SET();
@@ -188,28 +301,105 @@ void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd
     LCD_SPI_SendByte(yEnd >> 8);
     LCD_SPI_SendByte(yEnd & 0xFF);
 
-    // 写GRAM命令 (0x2C)
+    /* Write GRAM command (0x2C) */
     LCD_DC_CLR();
     LCD_SPI_SendByte(lcddev.wramcmd);
     LCD_DC_SET();
 
-    // 批量写像素数据
+    /* Ping-pong DMA transfer */
+    lcd_dma_buf_idx = 0;
+
     while (sent < total)
     {
         uint32_t batch = total - sent;
-        if (batch > 256) batch = 256;
+        uint32_t bytes;
+        uint8_t *buf;
 
+        if (batch > (LCD_DMA_BUF_SIZE / 2))
+            batch = (LCD_DMA_BUF_SIZE / 2);
+        bytes = batch * 2;
+
+        /* Prepare current buffer: byte-swap uint16 to big-endian */
+        buf = lcd_dma_buf[lcd_dma_buf_idx];
         for (i = 0; i < batch; i++)
         {
             uint16_t pixel = pBuf[sent + i];
-            txBuf[i * 2]     = pixel >> 8;
-            txBuf[i * 2 + 1] = pixel & 0xFF;
+            buf[i * 2]     = pixel >> 8;
+            buf[i * 2 + 1] = pixel & 0xFF;
         }
 
-        HAL_SPI_Transmit(&hlcd_spi, txBuf, batch * 2, HAL_MAX_DELAY);
+        /* Wait for previous DMA to finish before starting new one */
+        LCD_DMA_Wait();
+
+        /* Start DMA transfer */
+        LCD_SPI_SendBytes_DMA(buf, (uint16_t)bytes);
+
+        /* Switch to other buffer for next batch preparation */
+        lcd_dma_buf_idx ^= 1;
         sent += batch;
     }
 
+    /* Wait for last DMA transfer to complete */
+    LCD_DMA_Wait();
+    LCD_CS_SET();
+}
+
+/**
+ * @brief  Write pixel buffer to LCD (window must be set beforehand, DMA accelerated)
+ * @param  pBuf: pointer to uint16_t pixel array (RGB565)
+ * @param  pixel_count: number of pixels to write
+ * @note   Call LCD_SetWindows() before this function
+ */
+void LCD_WriteDataBuffer(uint16_t *pBuf, uint32_t pixel_count)
+{
+    uint32_t sent = 0;
+    uint32_t i;
+
+    /* Ensure no previous DMA is running */
+    LCD_DMA_Wait();
+
+    LCD_CS_CLR();
+
+    /* Write GRAM command */
+    LCD_DC_CLR();
+    LCD_SPI_SendByte(lcddev.wramcmd);
+    LCD_DC_SET();
+
+    /* Ping-pong DMA transfer */
+    lcd_dma_buf_idx = 0;
+
+    while (sent < pixel_count)
+    {
+        uint32_t batch = pixel_count - sent;
+        uint32_t bytes;
+        uint8_t *buf;
+
+        if (batch > (LCD_DMA_BUF_SIZE / 2))
+            batch = (LCD_DMA_BUF_SIZE / 2);
+        bytes = batch * 2;
+
+        /* Prepare current buffer: byte-swap uint16 to big-endian */
+        buf = lcd_dma_buf[lcd_dma_buf_idx];
+        for (i = 0; i < batch; i++)
+        {
+            uint16_t pixel = pBuf[sent + i];
+            buf[i * 2]     = pixel >> 8;
+            buf[i * 2 + 1] = pixel & 0xFF;
+        }
+
+        /* Wait for previous DMA to finish */
+        LCD_DMA_Wait();
+
+        /* Start DMA transfer */
+        LCD_SPI_SendBytes_DMA(buf, (uint16_t)bytes);
+
+        /* Switch buffer */
+        lcd_dma_buf_idx ^= 1;
+        sent += batch;
+    }
+
+    /* Wait for last DMA transfer to complete */
+    LCD_DMA_Wait();
     LCD_CS_SET();
 }
 
@@ -350,7 +540,7 @@ static void LCD_RESET(void)
 /* ======================== LCD GPIO Init ======================== */
 
 /**
- * @brief  Initialize control GPIOs (CS, DC, RST, LED on PD0-PD3)
+ * @brief  Initialize control GPIOs (CS, DC, RST on PD0-PD2, LED on PB4)
  */
 static void LCD_GPIO_Init(void)
 {
@@ -385,7 +575,7 @@ static void LCD_GPIO_Init(void)
 
 void LCD_Init(void)
 {
-    /* Initialize SPI4 peripheral */
+    /* Initialize SPI1 + DMA */
     LCD_SPI_Init();
 
     /* Initialize control GPIOs */

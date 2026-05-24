@@ -23,6 +23,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "Camera.h"
+#include "SensorTask.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -96,6 +97,7 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
 		xTaskCreate(Camera_task, "Camera_task", 1024, NULL, osPriorityNormal, NULL);
+		xTaskCreate(AHT20_Task, "AHT20_Task", 512 , NULL, osPriorityNormal, NULL);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
