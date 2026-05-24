@@ -151,3 +151,4 @@ uint8_t AHT20_Init(void)
     
     return 1;
 }
+

@@ -134,3 +134,4 @@ uint8_t MPU6050_GetDataFast(int16_t *AccX, int16_t *AccY, int16_t *AccZ,
     
     return 0;
 }
+

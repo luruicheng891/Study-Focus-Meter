@@ -50,3 +50,4 @@ void AHT20_Task(void *pvParameters)
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
     }
 }
+

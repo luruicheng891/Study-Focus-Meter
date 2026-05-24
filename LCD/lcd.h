@@ -111,5 +111,6 @@ void LCD_direction(uint8_t direction);
 void LCD_Fill(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t color);
 void LCD_DrawBuffer(uint16_t xStar, uint16_t yStar, uint16_t xEnd, uint16_t yEnd, uint16_t *pBuf);
 void LCD_WriteDataBuffer(uint16_t *pBuf, uint32_t pixel_count);
-
+void LCD_DMA_Wait(void);
+void LCD_FlushRaw(uint8_t *pData, uint32_t len);
 #endif /* __LCD_H */
