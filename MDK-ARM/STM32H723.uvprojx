@@ -1699,28 +1699,6 @@
         </Group>
         <Group>
           <GroupName>LVGL_UI</GroupName>
-          <Files>
-            <File>
-              <FileName>img_clothes.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\LVGL\demos\widgets\assets\img_clothes.c</FilePath>
-            </File>
-            <File>
-              <FileName>img_demo_widgets_avatar.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\LVGL\demos\widgets\assets\img_demo_widgets_avatar.c</FilePath>
-            </File>
-            <File>
-              <FileName>img_lvgl_logo.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\LVGL\demos\widgets\assets\img_lvgl_logo.c</FilePath>
-            </File>
-            <File>
-              <FileName>lv_demo_widgets.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\LVGL\demos\widgets\lv_demo_widgets.c</FilePath>
-            </File>
-          </Files>
         </Group>
         <Group>
           <GroupName>::CMSIS</GroupName>
