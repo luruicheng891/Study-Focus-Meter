@@ -64,10 +64,13 @@ static void LCD_SPI_SendBytes(uint8_t *buf, uint16_t len)
 
 /* ======================== DMA Helper Functions ======================== */
 
+/* 前向声明 */
+static void LCD_SPI_SendBytes_DMA(uint8_t *buf, uint16_t len);
+
 /**
  * @brief  Wait for ongoing DMA transfer to complete (with timeout)
  */
-static void LCD_DMA_Wait(void)
+void LCD_DMA_Wait(void)
 {
     volatile uint32_t timeout = 0xFFFFFF;  /* ~16M iterations, safety timeout */
     while (lcd_dma_busy && (--timeout > 0))
@@ -80,6 +83,55 @@ static void LCD_DMA_Wait(void)
         HAL_SPI_Abort(&hlcd_spi);
         lcd_dma_busy = 0;
     }
+}
+
+/**
+ * @brief  直接 DMA 发送原始字节到 LCD (无 byte swap)
+ * @param  pData: 数据指针 (必须在 DMA 可访问内存中, 或由此函数拷贝到 DMA buffer)
+ * @param  len: 字节数
+ * @note   用于 LV_COLOR_16_SWAP=1 时, LVGL buffer 已是大端序, 直接发送
+ *         由于 LVGL buffer 在 DTCM 中 (DMA 不可访问), 需要分批拷贝到 AXI SRAM 再 DMA 发送
+ */
+void LCD_FlushRaw(uint8_t *pData, uint32_t len)
+{
+    uint32_t sent = 0;
+
+    LCD_DMA_Wait();
+    LCD_CS_CLR();
+
+    /* 发送 GRAM 写命令 */
+    LCD_DC_CLR();
+    LCD_SPI_SendByte(lcddev.wramcmd);
+    LCD_DC_SET();
+
+    /* 分批通过 DMA buffer 发送 (因为源数据可能在 DTCM, DMA 不可访问) */
+    lcd_dma_buf_idx = 0;
+
+    while (sent < len)
+    {
+        uint32_t batch = len - sent;
+        uint8_t *buf;
+        uint32_t i;
+
+        if (batch > LCD_DMA_BUF_SIZE)
+            batch = LCD_DMA_BUF_SIZE;
+
+        /* 拷贝到 DMA 可访问的 AXI SRAM buffer */
+        buf = lcd_dma_buf[lcd_dma_buf_idx];
+        for (i = 0; i < batch; i++)
+        {
+            buf[i] = pData[sent + i];
+        }
+
+        LCD_DMA_Wait();
+        LCD_SPI_SendBytes_DMA(buf, (uint16_t)batch);
+
+        lcd_dma_buf_idx ^= 1;
+        sent += batch;
+    }
+
+    LCD_DMA_Wait();
+    LCD_CS_SET();
 }
 
 /**

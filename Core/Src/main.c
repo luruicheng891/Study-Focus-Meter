@@ -3,7 +3,7 @@
 	*	@file  	main.c
 	*	@version V1.0
 	*
-	*	OV2640采集图像显示到ILI9341 LCD屏幕
+	*	OV2640采集图像显示到ILI9341 LCD屏幕 (LVGL + FreeRTOS)
 	*
 	************************************************************************************************
 ***/
@@ -13,7 +13,14 @@
 #include "lcd.h"
 #include "dcmi_ov2640.h"
 #include "FreeRTOS.h"
+#include "task.h"
 #include "cJSON.h"
+
+#include "lvgl.h"
+#include "lv_port_disp.h"
+#include "TIM.h"
+#include "display_mode.h"
+
 
 /*cJSON内存适配FreeRTOS*/
 static void* cjson_malloc(size_t size) {
@@ -24,11 +31,8 @@ static void cjson_free(void *ptr) {
     vPortFree(ptr);
 }
 
-
-
 void CJSON_Init(void)
 {
-// 替换cJSON内存分配为FreeRTOS heap_4
 	cJSON_Hooks hooks;
 	hooks.malloc_fn = cjson_malloc;
 	hooks.free_fn = cjson_free;
@@ -36,11 +40,11 @@ void CJSON_Init(void)
 }
 
 
-
 /********************************************** 函数声明 *******************************************/
 
 void MPU_Config(void);
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 
 /***************************************************************************************************
 *	函 数 名: main
@@ -54,19 +58,32 @@ int main(void)
 	HAL_Init();
 	
 	SystemClock_Config();
-	//USART1_Init();
 	CJSON_Init();
 	
-	MX_FREERTOS_Init();
+	/* 初始化 USART1 (调试串口, printf 输出) */
+	USART1_Init();
 
+	/* 启动 USART1 单字节中断接收, 用于命令切换显示模式 ('C'/'W') */
+	DisplayMode_StartUart1Rx();
 	
-	/*开启Freertos的任务调度*/
+	/* 初始化 LCD 硬件 */
+	LCD_Init();
+	
+	/* 初始化 LVGL */
+	lv_init();
+	lv_port_disp_init();
+	
+	/* 启动 TIM7 为 LVGL 提供 1ms 心跳 */
+	TIM7_Init();
+	
+	/* 初始化 FreeRTOS 任务 */
+	MX_FREERTOS_Init();
+	
+	/* 开启 FreeRTOS 任务调度 */
 	vTaskStartScheduler();
-	
 	
 	while (1)
 	{
-		
 	}
 }
 

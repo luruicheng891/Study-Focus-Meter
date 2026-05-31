@@ -41,7 +41,7 @@
 .\stm32h723\dcmi_ov2640.o: ..\Drivers\User\Inc\usart.h
 .\stm32h723\dcmi_ov2640.o: ../Core/Inc/main.h
 .\stm32h723\dcmi_ov2640.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
-.\stm32h723\dcmi_ov2640.o: .\LCD\lcd.h
+.\stm32h723\dcmi_ov2640.o: ..\LCD\lcd.h
 .\stm32h723\dcmi_ov2640.o: ..\Drivers\User\Inc\dcmi_ov2640_cfg.h
 .\stm32h723\dcmi_ov2640.o: ..\Freertos\include\FreeRTOS.h
 .\stm32h723\dcmi_ov2640.o: ../Core/Inc/FreeRTOSConfig.h

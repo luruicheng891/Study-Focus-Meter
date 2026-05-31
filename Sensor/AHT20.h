@@ -24,3 +24,6 @@ void AHT20_Soft_Reset(void);
 void AHT20_Debug_Print(void);
 
 #endif
+
+
+

@@ -1,8 +1,8 @@
 .\stm32h723\sensortask.o: ..\Task\SensorTask.c
-.\stm32h723\sensortask.o: ..\Sensor\AHT20.h
-.\stm32h723\sensortask.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdint.h
+.\stm32h723\sensortask.o: ..\Task\SensorTask.h
 .\stm32h723\sensortask.o: ..\Freertos\include\FreeRTOS.h
 .\stm32h723\sensortask.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stddef.h
+.\stm32h723\sensortask.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdint.h
 .\stm32h723\sensortask.o: ../Core/Inc/FreeRTOSConfig.h
 .\stm32h723\sensortask.o: ..\Freertos\include\projdefs.h
 .\stm32h723\sensortask.o: ..\Freertos\include\portable.h
@@ -12,7 +12,8 @@
 .\stm32h723\sensortask.o: ..\Freertos\include\queue.h
 .\stm32h723\sensortask.o: ..\Freertos\include\task.h
 .\stm32h723\sensortask.o: ..\Freertos\include\list.h
-.\stm32h723\sensortask.o: ..\Drivers\User\Inc\USART.h
+.\stm32h723\sensortask.o: ..\Sensor\AHT20.h
+.\stm32h723\sensortask.o: ..\Sensor\BH1750.h
 .\stm32h723\sensortask.o: ../Core/Inc/main.h
 .\stm32h723\sensortask.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
 .\stm32h723\sensortask.o: ../Core/Inc/stm32h7xx_hal_conf.h
@@ -49,4 +50,6 @@
 .\stm32h723\sensortask.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi_ex.h
 .\stm32h723\sensortask.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 .\stm32h723\sensortask.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+.\stm32h723\sensortask.o: ..\Communication\I2C.h
+.\stm32h723\sensortask.o: ..\Drivers\User\Inc\USART.h
 .\stm32h723\sensortask.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h

@@ -1,6 +1,6 @@
 --cpu Cortex-M7.fp.dp -g --apcs=interwork --pd "__MICROLIB SETA 1"
--I E:\Desktop\AIÑ§Ï°×´Ì¬¼à²âÒÇ·ÖÎö\MDK-ARM\RTE
--I D:\Keil5\ARM\PACK\ARM\CMSIS\4.2.0\CMSIS\Include
--I D:\Keil5\ARM\PACK\Keil\STM32H7xx_DFP\3.1.1
---pd "__UVISION_VERSION SETA 514" --pd "_RTE_ SETA 1" --pd "STM32H723xx SETA 1"
--o .\stm32h723\startup_stm32h723xx.o --depend .\stm32h723\startup_stm32h723xx.d "startup_stm32h723xx.s"
+-I.\RTE\_STM32H723
+-ID:\Keil5\ARM\Pack\ARM\CMSIS\4.2.0\CMSIS\Include
+-ID:\Keil5\ARM\Pack\Keil\STM32H7xx_DFP\3.1.1\Drivers\CMSIS\Device\ST\STM32H7xx\Include
+--pd "__UVISION_VERSION SETA 543" --pd "STM32H723xx SETA 1" --pd "_RTE_ SETA 1"
+-o .\stm32h723\startup_stm32h723xx.o --depend .\stm32h723\startup_stm32h723xx.d "RTE/Device/STM32H723ZGTx/startup_stm32h723xx.s"

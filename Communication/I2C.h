@@ -30,3 +30,8 @@ uint8_t I2C_WriteData(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_
 uint8_t I2C_ReadData(uint8_t dev_addr, uint8_t reg_addr, uint8_t *buffer, uint16_t len);
 
 #endif
+
+
+
+
+

@@ -2,17 +2,7 @@
 /**
   ******************************************************************************
   * File Name          : freertos.c
-  * Description        : Code for freertos applications
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
+  * Description        : FreeRTOS 任务初始化与 LVGL 任务
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -24,100 +14,53 @@
 #include "cmsis_os.h"
 #include "Camera.h"
 #include "SensorTask.h"
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
+#include "WeatherTask.h"
+#include "UART.h"
+#include "display_mode.h"
+#include "lvgl.h"
 
 /* Private variables ---------------------------------------------------------*/
-/* USER CODE BEGIN Variables */
-
-/* USER CODE END Variables */
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
 
 /* Private function prototypes -----------------------------------------------*/
-/* USER CODE BEGIN FunctionPrototypes */
+static void LVGL_Task(void *argument);
 
-/* USER CODE END FunctionPrototypes */
+/* Exported functions --------------------------------------------------------*/
 
-
-
-void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+void MX_FREERTOS_Init(void);
 
 /**
   * @brief  FreeRTOS initialization
-  * @param  None
-  * @retval None
   */
-void MX_FREERTOS_Init(void) {
-  /* USER CODE BEGIN Init */
+void MX_FREERTOS_Init(void)
+{
+    /* LVGL 任务: 负责调用 lv_timer_handler(), 栈 2KB, 优先级较高确保 UI 流畅 */
+    xTaskCreate(LVGL_Task, "LVGL_Task", 512, NULL, osPriorityAboveNormal, NULL);
 
-  /* USER CODE END Init */
+    /* 摄像头任务: 采集 + 通知 LVGL 刷新, 栈 4KB */
+    xTaskCreate(Camera_task, "Camera_task", 1024, NULL, osPriorityNormal, NULL);
 
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
+    /* AHT20 传感器任务 */
+    xTaskCreate(AHT20_Task, "AHT20_Task", 512, NULL, osPriorityNormal, NULL);
 
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
+    /* 温湿度 LVGL 显示任务: 从队列读取 AHT20 数据并更新 UI, 栈 2KB */
+    xTaskCreate(Weather_Task, "Weather_Task", 512, NULL, osPriorityNormal, NULL);
 
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
-
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
-
-  /* Create the thread(s) */
-  /* creation of defaultTask */
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-		xTaskCreate(Camera_task, "Camera_task", 1024, NULL, osPriorityNormal, NULL);
-		xTaskCreate(AHT20_Task, "AHT20_Task", 512 , NULL, osPriorityNormal, NULL);
-  /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
-
+    /* ESP-01 天气数据接收+解析任务 (USART3 + DMA + IDLE), 栈 2KB */
+    xTaskCreate(Weather_RxTask, "Weather_RxTask", 512, NULL, osPriorityNormal, NULL);
 }
 
-/* USER CODE BEGIN Header_StartDefaultTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
-  * @param  argument: Not used
-  * @retval None
+  * @brief  LVGL 定时处理任务
+  * @note   必须定期调用 lv_timer_handler() 驱动 LVGL 内部定时器和刷屏
+  *         建议周期 5~10ms
   */
-/* USER CODE END Header_StartDefaultTask */
+static void LVGL_Task(void *argument)
+{
+    (void)argument;
 
-	
-
-/* Private application code --------------------------------------------------*/
-/* USER CODE BEGIN Application */
-
-/* USER CODE END Application */
-
+    while (1)
+    {
+        lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+}
