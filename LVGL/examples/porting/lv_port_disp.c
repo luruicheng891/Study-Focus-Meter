@@ -15,8 +15,9 @@
 /*********************
  *      DEFINES
  *********************/
-#define MY_DISP_HOR_RES    240
-#define MY_DISP_VER_RES    320
+/* 横屏显示: 320 (宽) x 240 (高) */
+#define MY_DISP_HOR_RES    320
+#define MY_DISP_VER_RES    240
 
 /**********************
  *  STATIC PROTOTYPES

@@ -82,6 +82,38 @@ extern DMA_HandleTypeDef DMA_Handle_dcmi;
 extern DMA_HandleTypeDef hdma_spi1_tx;
 extern SPI_HandleTypeDef hlcd_spi;
 
+/* USART3 (ESP-01) DMA 接收 */
+extern DMA_HandleTypeDef hdma_usart3_rx;
+extern void USART3_IRQ_Handler(void);
+
+/* USART1 (调试 + 命令接收) */
+extern UART_HandleTypeDef huart1;
+extern void USART1_IRQ_Handler(void);
+
+/**
+  * @brief  USART1 中断 (单字节命令接收: 'C'/'W' 切换显示模式)
+  */
+void USART1_IRQHandler(void)
+{
+  USART1_IRQ_Handler();
+}
+
+/**
+  * @brief  USART3 中断 (ESP-01 接收, IDLE 检测)
+  */
+void USART3_IRQHandler(void)
+{
+  USART3_IRQ_Handler();
+}
+
+/**
+  * @brief  DMA1_Stream1 中断 (USART3_RX 使用)
+  */
+void DMA1_Stream1_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(&hdma_usart3_rx);
+}
+
 /**
   * @brief  SPI1中断服务函数 (SPI错误处理)
   */

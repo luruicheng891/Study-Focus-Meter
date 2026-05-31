@@ -130,7 +130,7 @@
 .\stm32h723\lv_port_disp.o: ..\LVGL\src/extra/widgets/led/lv_led.h
 .\stm32h723\lv_port_disp.o: ..\LVGL\src/extra/widgets/imgbtn/lv_imgbtn.h
 .\stm32h723\lv_port_disp.o: ..\LVGL\src/extra/widgets/span/lv_span.h
-.\stm32h723\lv_port_disp.o: .\LCD\lcd.h
+.\stm32h723\lv_port_disp.o: ..\LCD\lcd.h
 .\stm32h723\lv_port_disp.o: ../Core/Inc/main.h
 .\stm32h723\lv_port_disp.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
 .\stm32h723\lv_port_disp.o: ../Core/Inc/stm32h7xx_hal_conf.h

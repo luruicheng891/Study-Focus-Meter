@@ -19,6 +19,7 @@
 #include "lvgl.h"
 #include "lv_port_disp.h"
 #include "TIM.h"
+#include "display_mode.h"
 
 
 /*cJSON内存适配FreeRTOS*/
@@ -58,6 +59,12 @@ int main(void)
 	
 	SystemClock_Config();
 	CJSON_Init();
+	
+	/* 初始化 USART1 (调试串口, printf 输出) */
+	USART1_Init();
+
+	/* 启动 USART1 单字节中断接收, 用于命令切换显示模式 ('C'/'W') */
+	DisplayMode_StartUart1Rx();
 	
 	/* 初始化 LCD 硬件 */
 	LCD_Init();

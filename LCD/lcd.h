@@ -35,7 +35,7 @@ typedef struct
 extern LCD_Dev_t lcddev;
 
 /* User configuration */
-#define USE_HORIZONTAL  0  // 0-0°, 1-90°, 2-180°, 3-270°
+#define USE_HORIZONTAL  1  // 0-0°, 1-90°, 2-180°, 3-270°  (1 = 横屏 320x240)
 
 /* LCD size */
 #define LCD_W 240

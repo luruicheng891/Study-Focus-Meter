@@ -1,4 +1,4 @@
-.\stm32h723\system_stm32h7xx.o: ../Core/Src/system_stm32h7xx.c
+.\stm32h723\system_stm32h7xx.o: RTE/Device/STM32H723ZGTx/system_stm32h7xx.c
 .\stm32h723\system_stm32h7xx.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
 .\stm32h723\system_stm32h7xx.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h
 .\stm32h723\system_stm32h7xx.o: ../Drivers/CMSIS/Include/core_cm7.h

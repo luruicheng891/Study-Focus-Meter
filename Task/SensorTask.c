@@ -1,125 +1,183 @@
 /**
   ******************************************************************************
   * @file    SensorTask.c
-  * @brief   AHT20 传感器采集任务, 定时读取温湿度并发送到队列
+  * @brief   传感器采集任务: AHT20 温湿度 + BH1750 光照强度
+  * @note    AHT20 和 BH1750 共享同一 I2C 总线 (PB8=SCL, PB9=SDA)
+  *          AHT20 地址: 0x38, BH1750 地址: 0x23 (ADDR=GND)
+  *          两个传感器独立初始化, 任一个不在线不影响另一个工作
   ******************************************************************************
   */
 
+#include "SensorTask.h"
 #include "AHT20.h"
+#include "BH1750.h"
 #include "I2C.h"
 #include "USART.h"
+#include "FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
 #include <stdio.h>
 
-// 全局消息队列句柄
-QueueHandle_t xAHT20DataQueue;
+/* 全局队列句柄 */
+QueueHandle_t xSensorDataQueue;
+QueueHandle_t xAHT20DataQueue;  /* 兼容旧接口 */
+
+/* BH1750 设备句柄 */
+static BH1750_Handle_t bh1750_dev;
+
+/* 传感器在线标志 */
+static uint8_t aht20_online = 0;
+static uint8_t bh1750_online = 0;
 
 /**
-  * @brief  I2C 总线扫描 - 检测 AHT20 是否在线
-  * @retval 0=检测到ACK(设备在线), 1=NACK(设备不在线)
+  * @brief  I2C 总线扫描 - 检测设备是否在线
+  * @param  addr: 7-bit 设备地址
+  * @retval 0=ACK(在线), 1=NACK(不在线)
   */
-static uint8_t AHT20_Check_Online(void)
+static uint8_t I2C_Check_Device(uint8_t addr)
 {
     uint8_t ack;
-    
     I2C_Start();
-    ack = I2C_WriteByte((0x38 << 1) | 0);  // 发送 AHT20 写地址
+    ack = I2C_WriteByte((addr << 1) | 0);
     I2C_Stop();
-    
-    return ack;  // 0=ACK(在线), 1=NACK(不在线)
+    return ack;
 }
 
 void AHT20_Task(void *pvParameters)
 {
-    AHT20_Data_t sensor_data;
+    SensorData_t sensor_data;
+    AHT20_Data_t aht20_data;
     TickType_t xLastWakeTime;
     uint8_t ret;
-    
-    printf("\r\n========== AHT20 Task Start ==========\r\n");
-    
-    // 创建消息队列
+    float lux_value = 0.0f;
+
+    (void)pvParameters;
+
+    printf("\r\n========== Sensor Task Start ==========\r\n");
+
+    /* 创建队列 */
+    xSensorDataQueue = xQueueCreate(1, sizeof(SensorData_t));
     xAHT20DataQueue = xQueueCreate(5, sizeof(AHT20_Data_t));
-    
-    if(xAHT20DataQueue == NULL)
+
+    if(xSensorDataQueue == NULL || xAHT20DataQueue == NULL)
     {
-        printf("[AHT20] ERROR: Failed to create queue!\r\n");
+        printf("[Sensor] ERROR: Failed to create queue!\r\n");
         vTaskDelete(NULL);
         return;
     }
-    printf("[AHT20] Queue created OK\r\n");
-    
-    // 确保 I2C GPIO 已初始化
+    printf("[Sensor] Queues created OK\r\n");
+
+    /* 初始化 I2C GPIO */
     I2C_Sim_Init();
-    printf("[AHT20] I2C GPIO Init (PB8=SCL, PB9=SDA)\r\n");
-    
-    // 延时等待 AHT20 上电稳定
+    printf("[Sensor] I2C GPIO Init (PB8=SCL, PB9=SDA)\r\n");
+
+    /* 等待上电稳定 */
     vTaskDelay(pdMS_TO_TICKS(100));
-    
-    // 扫描 I2C 总线, 检测 AHT20 是否应答
-    ret = AHT20_Check_Online();
-    printf("[AHT20] I2C scan addr 0x38: %s\r\n", (ret == 0) ? "ACK (online)" : "NACK (offline!)");
-    
-    if(ret != 0)
-    {
-        printf("[AHT20] ERROR: Device not found on I2C bus!\r\n");
-        printf("[AHT20] Check wiring: PB8->SCL, PB9->SDA, VCC=3.3V, pull-up resistors\r\n");
-        // 不立即删除任务, 继续重试
-        for(int i = 0; i < 5; i++)
-        {
-            vTaskDelay(pdMS_TO_TICKS(500));
-            ret = AHT20_Check_Online();
-            printf("[AHT20] Retry %d: %s\r\n", i+1, (ret == 0) ? "ACK" : "NACK");
-            if(ret == 0) break;
-        }
-        if(ret != 0)
-        {
-            printf("[AHT20] FATAL: Device unreachable, task exit.\r\n");
-            vTaskDelete(NULL);
-            return;
-        }
-    }
-    
-    // 初始化传感器
-    printf("[AHT20] Initializing sensor...\r\n");
+
+    /* ========== 扫描 I2C 总线 ========== */
+    ret = I2C_Check_Device(0x38);
+    printf("[Sensor] AHT20  (0x38): %s\r\n", (ret == 0) ? "ACK" : "NACK");
+
+    ret = I2C_Check_Device(0x23);
+    printf("[Sensor] BH1750 (0x23): %s\r\n", (ret == 0) ? "ACK" : "NACK");
+
+    /* ========== 初始化 AHT20 (可选) ========== */
+    printf("[Sensor] Initializing AHT20...\r\n");
     if(AHT20_Init())
     {
-        printf("[AHT20] Init Success!\r\n");
+        printf("[Sensor] AHT20 Init OK\r\n");
+        aht20_online = 1;
     }
     else
     {
-        printf("[AHT20] Init Failed! (no CAL bit after retries)\r\n");
+        printf("[Sensor] AHT20 Init FAILED (not connected?)\r\n");
+        aht20_online = 0;
+    }
+
+    /* ========== 初始化 BH1750 (可选) ========== */
+    printf("[Sensor] Initializing BH1750...\r\n");
+    ret = BH1750_Init(&bh1750_dev, 0);  /* ADDR pin = GND, 地址 0x23 */
+    if(ret == BH1750_OK)
+    {
+        printf("[Sensor] BH1750 Init OK\r\n");
+        /* 启动连续高分辨率测量模式 (1lx, 120ms) */
+        ret = BH1750_StartMeasurement(&bh1750_dev, BH1750_CMD_CONT_H_RES_MODE);
+        if(ret == BH1750_OK)
+        {
+            printf("[Sensor] BH1750 Continuous H-Res mode started\r\n");
+            bh1750_online = 1;
+        }
+        else
+        {
+            printf("[Sensor] BH1750 start measurement FAILED (ret=%d)\r\n", ret);
+            bh1750_online = 0;
+        }
+    }
+    else
+    {
+        printf("[Sensor] BH1750 Init FAILED (ret=%d)\r\n", ret);
+        bh1750_online = 0;
+    }
+
+    /* 检查是否至少有一个传感器在线 */
+    if(!aht20_online && !bh1750_online)
+    {
+        printf("[Sensor] FATAL: No sensor online, task exit.\r\n");
         vTaskDelete(NULL);
         return;
     }
-    
-    // 开始周期采集
+
+    /* 等待 BH1750 第一次测量完成 (180ms max) */
+    if(bh1750_online)
+    {
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    /* ========== 开始周期采集 ========== */
     xLastWakeTime = xTaskGetTickCount();
-    printf("[AHT20] Starting periodic measurement (1s interval)\r\n");
-    
+    printf("[Sensor] Starting periodic measurement (1s interval)\r\n");
+    printf("[Sensor] AHT20=%s, BH1750=%s\r\n",
+           aht20_online ? "ON" : "OFF",
+           bh1750_online ? "ON" : "OFF");
+
     for(;;)
     {
-        // 读取温湿度
-        AHT20_Get_Temp_Humidity(&sensor_data.temperature, &sensor_data.humidity);
-        sensor_data.timestamp = xTaskGetTickCount();
-        
-        // 串口打印原始数据用于调试
-//        printf("[AHT20] T=%d.%02d C, H=%u.%02u%%, tick=%u\r\n",
-//               (int)(sensor_data.temperature / 100),
-//               (int)(sensor_data.temperature >= 0 ? sensor_data.temperature % 100 : (-sensor_data.temperature) % 100),
-//               (unsigned int)(sensor_data.humidity / 100),
-//               (unsigned int)(sensor_data.humidity % 100),
-//               (unsigned int)sensor_data.timestamp);
-        
-        // 检查数据合理性
-        if(sensor_data.temperature == -5000 && sensor_data.humidity == 0)
+        /* 清零 */
+        sensor_data.temperature = 0;
+        sensor_data.humidity = 0;
+        sensor_data.lux_x100 = 0;
+
+        /* 读取 AHT20 温湿度 */
+        if(aht20_online)
         {
-            printf("[AHT20] WARNING: Raw data all zero, I2C read may have failed!\r\n");
+            AHT20_Get_Temp_Humidity(&aht20_data.temperature, &aht20_data.humidity);
+            aht20_data.timestamp = xTaskGetTickCount();
+            sensor_data.temperature = aht20_data.temperature;
+            sensor_data.humidity = aht20_data.humidity;
+
+            /* 发送到兼容队列 */
+            xQueueSend(xAHT20DataQueue, &aht20_data, 0);
         }
-        
-        // 发送数据到队列
-        xQueueSend(xAHT20DataQueue, &sensor_data, 0);
-        
-        // 固定周期延时
+
+        /* 读取 BH1750 光照 */
+        if(bh1750_online)
+        {
+            ret = BH1750_ReadLux(&bh1750_dev, &lux_value);
+            if(ret == BH1750_OK)
+            {
+                sensor_data.lux_x100 = (uint32_t)(lux_value * 100.0f);
+            }
+            else
+            {
+                printf("[Sensor] BH1750 read err=%d\r\n", ret);
+            }
+        }
+
+        /* 填充时间戳并发送综合数据 */
+        sensor_data.timestamp = xTaskGetTickCount();
+        xQueueOverwrite(xSensorDataQueue, &sensor_data);
+
+        /* 固定周期 1 秒 */
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
     }
 }

@@ -57,8 +57,13 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 		GPIO_InitStruct.Alternate 	= GPIO_AF7_USART1;				// 复用功能为USART1
 		HAL_GPIO_Init(USART1_TX_PORT, &GPIO_InitStruct);
 
-		// 配置RX引脚（复用推挽输出，内部上拉，高速，复用功能为USART1）
+		// 配置RX引脚 (复用输入, 内部上拉, 高速, 复用功能为USART1)
+		// 注意: RX 在 AF 模式下由 USART 外设作为输入使用, 上拉防止悬空时误读
 		GPIO_InitStruct.Pin 			= USART1_RX_PIN;					// RX引脚
+		GPIO_InitStruct.Mode 		= GPIO_MODE_AF_PP;				// 复用模式 (输入由外设控制)
+		GPIO_InitStruct.Pull 		= GPIO_PULLUP;						// 上拉, UART 空闲时保持高电平
+		GPIO_InitStruct.Speed 		= GPIO_SPEED_FREQ_VERY_HIGH;
+		GPIO_InitStruct.Alternate 	= GPIO_AF7_USART1;
 		HAL_GPIO_Init(USART1_RX_PORT, &GPIO_InitStruct);
 
 		// 设置DMA1数据流0中断优先级（主优先级0，子优先级1）并使能中断
@@ -211,12 +216,16 @@ void _sys_exit(int x)                   // 定义_sys_exit函数
 *	函数功能: fputc - 重定向fputc函数，实现printf输出
 *	输入参数: ch - 要发送的字符, f - 文件指针（该参数未使用）
 *	返回值:   成功时返回字符，失败时返回EOF（-1）
-*	说明:     将标准C库的fputc重定向到USART1串口发送，使printf函数可以通过串口输出
+*	说明:     【已迁移】实际 fputc 实现位于 Task/display_mode.c, 改用环形缓冲 +
+*	          TXE 中断的非阻塞方式, 解决多任务并发 printf 阻塞死锁问题.
+*	          此处保留旧版本作参考, 已注释禁用.
 *************************************************************************************************/
 
+#if 0   /* 已被 display_mode.c 中的非阻塞 fputc 取代 */
 int fputc(int ch, FILE *f)
 {
 	// 通过USART1发送单个字符（阻塞模式，超时时间100ms）
 	HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 100);
 	return (ch);
 }
+#endif

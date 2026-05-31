@@ -49,10 +49,6 @@
 .\stm32h723\freertos.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os.h
 .\stm32h723\freertos.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os2.h
 .\stm32h723\freertos.o: ..\Task\Camera.h
-.\stm32h723\freertos.o: ..\Task\SensorTask.h
-.\stm32h723\freertos.o: ..\Freertos\include\queue.h
-.\stm32h723\freertos.o: ..\Sensor\AHT20.h
-.\stm32h723\freertos.o: ..\Task\WeatherTask.h
 .\stm32h723\freertos.o: ..\LVGL\lvgl.h
 .\stm32h723\freertos.o: ..\LVGL\src/misc/lv_log.h
 .\stm32h723\freertos.o: ..\LVGL\src/misc/../lv_conf_internal.h
@@ -181,3 +177,9 @@
 .\stm32h723\freertos.o: ..\LVGL\src/extra/widgets/led/lv_led.h
 .\stm32h723\freertos.o: ..\LVGL\src/extra/widgets/imgbtn/lv_imgbtn.h
 .\stm32h723\freertos.o: ..\LVGL\src/extra/widgets/span/lv_span.h
+.\stm32h723\freertos.o: ..\Task\SensorTask.h
+.\stm32h723\freertos.o: ..\Freertos\include\queue.h
+.\stm32h723\freertos.o: ..\Sensor\AHT20.h
+.\stm32h723\freertos.o: ..\Task\WeatherTask.h
+.\stm32h723\freertos.o: ..\Sensor\UART.h
+.\stm32h723\freertos.o: ..\Task\display_mode.h

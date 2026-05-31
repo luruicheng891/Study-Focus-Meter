@@ -40,7 +40,7 @@
 .\stm32h723\main.o: ..\Drivers\User\Inc\led.h
 .\stm32h723\main.o: ..\Drivers\User\Inc\usart.h
 .\stm32h723\main.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
-.\stm32h723\main.o: .\LCD\lcd.h
+.\stm32h723\main.o: ..\LCD\lcd.h
 .\stm32h723\main.o: ..\Drivers\User\Inc\dcmi_ov2640.h
 .\stm32h723\main.o: ..\Drivers\User\Inc\sccb.h
 .\stm32h723\main.o: ..\Freertos\include\FreeRTOS.h
@@ -183,3 +183,4 @@
 .\stm32h723\main.o: ..\LVGL\src/extra/widgets/span/lv_span.h
 .\stm32h723\main.o: ..\LVGL\examples\porting\lv_port_disp.h
 .\stm32h723\main.o: ..\SYSTEM\TIM.h
+.\stm32h723\main.o: ..\Task\display_mode.h

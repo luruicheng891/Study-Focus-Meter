@@ -15,6 +15,8 @@
 #include "Camera.h"
 #include "SensorTask.h"
 #include "WeatherTask.h"
+#include "UART.h"
+#include "display_mode.h"
 #include "lvgl.h"
 
 /* Private variables ---------------------------------------------------------*/
@@ -42,6 +44,9 @@ void MX_FREERTOS_Init(void)
 
     /* 温湿度 LVGL 显示任务: 从队列读取 AHT20 数据并更新 UI, 栈 2KB */
     xTaskCreate(Weather_Task, "Weather_Task", 512, NULL, osPriorityNormal, NULL);
+
+    /* ESP-01 天气数据接收+解析任务 (USART3 + DMA + IDLE), 栈 2KB */
+    xTaskCreate(Weather_RxTask, "Weather_RxTask", 512, NULL, osPriorityNormal, NULL);
 }
 
 /**
