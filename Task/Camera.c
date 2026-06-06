@@ -10,6 +10,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "Camera.h"
+#include "AITask.h"
 #include "display_mode.h"
 #include "lcd.h"
 #include "dcmi_ov2640.h"
@@ -63,6 +64,11 @@ void Camera_task(void *argument)
             {
                 memcpy((void *)Canvas_Buffer, (void *)Camera_Buffer, Frame_Bytes);
                 lv_obj_invalidate(g_cam_canvas);
+
+                /* 通知 AI 推理任务: 有新帧可处理 (非阻塞) */
+                if (AI_TaskHandle != NULL) {
+                    xTaskNotifyGive(AI_TaskHandle);
+                }
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));

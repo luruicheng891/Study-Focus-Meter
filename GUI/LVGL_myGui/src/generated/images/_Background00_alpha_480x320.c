@@ -1,1 +1,0 @@
-/* placeholder file to satisfy project entry after removing large background image */

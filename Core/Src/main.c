@@ -156,7 +156,7 @@ void MPU_Config(void)
 
 void Error_Handler(void)
 {
-  __disable_irq();//全局禁用所有可屏蔽中断
+  __disable_irq();
   while (1)
   {
   }

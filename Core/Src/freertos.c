@@ -15,6 +15,7 @@
 #include "Camera.h"
 #include "SensorTask.h"
 #include "WeatherTask.h"
+#include "AITask.h"
 #include "UART.h"
 #include "display_mode.h"
 #include "lvgl.h"
@@ -47,6 +48,9 @@ void MX_FREERTOS_Init(void)
 
     /* ESP-01 天气数据接收+解析任务 (USART3 + DMA + IDLE), 栈 2KB */
     xTaskCreate(Weather_RxTask, "Weather_RxTask", 512, NULL, osPriorityNormal, NULL);
+
+    /* AI推理任务: 预处理+模型推理+结果显示, 栈 12KB, 优先级低于普通任务 */
+    xTaskCreate(AI_InferTask, "AI_Infer", 3072, NULL, osPriorityBelowNormal, &AI_TaskHandle);
 }
 
 /**

@@ -1,24 +1,16 @@
 /**
   ******************************************************************************
   * @file    WeatherTask.c
-  * @brief   320x240 横屏天气仪表板 (复用 Gui Guider 字体 + 小图标)
+  * @brief   LVGL 环境数据显示任务 (天气仪表板风格)
+  *          - 本地传感器: AHT20 温湿度 + BH1750 光照
+  *          - 远程天气:   ESP-01 通过 USART3 推送的 JSON 数据
   *
-  *          布局 (320x240):
-  *          +--------------------------------------------+
-  *          | [WiFi 20x20] ON         Time: 12:34:56    |  顶部状态条
-  *          +-----------------------+--------------------+
-  *          |        室内           |       室外         |
-  *          |                       |                    |
-  *          | [温40x40] 25 [°25x25] | [温40x40] 27 [°25] |
-  *          | [湿30x30] 56 [%26x26] | [湿30x30] 65 [%26] |
-  *          | City: Shanghai        | Feel 26 / Sunny    |
-  *          | Lux: 100              |                    |
-  *          +-----------------------+--------------------+
+  *          屏幕显示模式由 display_mode 模块控制, 通过 USART1 命令切换:
+  *            'C'/'c' → 显示摄像头画面 (隐藏天气面板)
+  *            'W'/'w' → 显示天气仪表板 (隐藏摄像头 canvas)
   *
-  *          说明:
-  *          1) Gui Guider 默认设计稿 480x320, 直接 setup_ui 会被裁掉, 故手工
-  *             搭 320x240 布局, 仅复用其字体与小图标.
-  *          2) 480x320 大背景图 (_Background00) 不引用, ARM linker 会丢弃.
+  *          全部天气 UI 控件挂在 g_weather_panel 容器下,
+  *          切换模式时仅 add/clear LV_OBJ_FLAG_HIDDEN, 高效不重建.
   ******************************************************************************
   */
 
@@ -26,316 +18,316 @@
 #include "SensorTask.h"
 #include "Camera.h"
 #include "display_mode.h"
-#include "UART.h"            /* WeatherInfo_t / xWeatherQueue */
+#include "UART.h"           /* WeatherInfo_t / xWeatherQueue */
 #include "lcd.h"             /* LCD_direction */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
 #include "lvgl.h"
-
-/* Gui Guider 头文件 (字体 + 图片 LV_IMG_DECLARE) */
-#include "gui_guider.h"
-
 #include <stdio.h>
 #include <string.h>
 
-/* ======================== 配色 ======================== */
-#define BG_COLOR        lv_color_hex(0xE6EBEF)
-#define CARD_BG         lv_color_hex(0xFFFFFF)
-#define BORDER_COLOR    lv_color_hex(0x6667FF)
-#define TITLE_BG        lv_color_hex(0x6667FF)
-#define TITLE_FG        lv_color_hex(0xFFFFFF)
-#define TEMP_COLOR      lv_color_hex(0xE53935)
-#define HUMI_COLOR      lv_color_hex(0x1E88E5)
-#define TEXT_COLOR      lv_color_hex(0x222222)
-#define DIM_COLOR       lv_color_hex(0x607D8B)
+/* ======================== 调色板 (Material Dark Weather) ======================== */
+#define COLOR_BG          lv_color_hex(0x1A2332)   /* 深蓝灰背景 */
+#define COLOR_CARD        lv_color_hex(0x2A3A52)   /* 卡片底色 */
+#define COLOR_CARD_ALT    lv_color_hex(0x35476B)   /* 卡片次色 */
+#define COLOR_ACCENT      lv_color_hex(0x4FC3F7)   /* 主强调 (青) */
+#define COLOR_TEMP        lv_color_hex(0xFF8A65)   /* 温度 (橙) */
+#define COLOR_HUMI        lv_color_hex(0x4DD0E1)   /* 湿度 (青蓝) */
+#define COLOR_LUX         lv_color_hex(0xFFD54F)   /* 光照 (黄) */
+#define COLOR_WIND        lv_color_hex(0xA5D6A7)   /* 风 (绿) */
+#define COLOR_PRES        lv_color_hex(0xCE93D8)   /* 气压 (紫) */
+#define COLOR_TEXT        lv_color_hex(0xECEFF1)   /* 主文字 (浅白) */
+#define COLOR_TEXT_DIM    lv_color_hex(0x90A4AE)   /* 次文字 (灰) */
 
-/* ======================== 字体 ======================== */
-#define FONT_TITLE      &lv_font_SourceHanSerifSC_Regular_17  /* 中文 室内/室外 */
-#define FONT_BIG        &lv_font_Alatsi_Regular_50            /* 大数字 */
-#define FONT_MED        &lv_font_Alatsi_Regular_25            /* 单位/中等 */
-#define FONT_SMALL      &lv_font_montserrat_14                /* ASCII 小字 */
-#define FONT_TIME       &lv_font_montserrat_18                /* 时间专用字体 18px */
+/* ======================== UI 控件 ======================== */
+static lv_obj_t *g_weather_panel = NULL;   /* 整个天气面板容器 (240x320) */
 
-/* ======================== 全局对象 ======================== */
-/* Gui Guider widgets_init.c 通过 extern 引用 guider_ui, 提供定义 */
-lv_ui guider_ui;
+/* 远程天气 (网络) */
+static lv_obj_t *label_w_city = NULL;
+static lv_obj_t *label_w_temp = NULL;     /* 大字号 */
+static lv_obj_t *label_w_cond = NULL;     /* 天气状况 */
+static lv_obj_t *label_w_feel = NULL;     /* 体感 */
+static lv_obj_t *label_w_humi = NULL;
+static lv_obj_t *label_w_wind = NULL;
+static lv_obj_t *label_w_pres = NULL;
 
-/* 屏幕 */
-static lv_obj_t *g_weather_screen = NULL;
-static lv_obj_t *g_cam_screen     = NULL;
+/* 本地传感器 */
+static lv_obj_t *label_l_temp = NULL;
+static lv_obj_t *label_l_humi = NULL;
+static lv_obj_t *label_l_lux  = NULL;
 
-/* 数据控件 */
-static lv_obj_t *label_wifi      = NULL;
-static lv_obj_t *label_time      = NULL;      /* 顶部时间显示 */
-static lv_obj_t *label_in_temp   = NULL;
-static lv_obj_t *label_in_humi   = NULL;
-static lv_obj_t *label_in_city   = NULL;      /* 室内城市名 */
-static lv_obj_t *label_in_lux    = NULL;
-static lv_obj_t *label_out_temp  = NULL;
-static lv_obj_t *label_out_humi  = NULL;
-static lv_obj_t *label_out_feel  = NULL;
-static lv_obj_t *label_out_cond  = NULL;
+/* ======================== 工具函数 ======================== */
 
-/* 远端最新数据时间, 用于 WiFi 状态判定 */
-static uint32_t last_remote_tick = 0;
-
-/* ======================== 工具 ======================== */
-static lv_obj_t *make_card(lv_obj_t *parent, int x, int y, int w, int h)
+static lv_obj_t *card_create(lv_obj_t *parent, lv_color_t bg,
+                             lv_coord_t w, lv_coord_t h,
+                             lv_align_t align, lv_coord_t x, lv_coord_t y)
 {
     lv_obj_t *card = lv_obj_create(parent);
-    lv_obj_set_pos(card, x, y);
     lv_obj_set_size(card, w, h);
-    lv_obj_set_style_radius(card, 6, 0);
-    lv_obj_set_style_border_width(card, 2, 0);
-    lv_obj_set_style_border_color(card, BORDER_COLOR, 0);
-    lv_obj_set_style_bg_color(card, CARD_BG, 0);
+    lv_obj_align(card, align, x, y);
+
+    lv_obj_set_style_bg_color(card, bg, 0);
     lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-    lv_obj_set_style_pad_all(card, 0, 0);
+    lv_obj_set_style_border_width(card, 0, 0);
+    lv_obj_set_style_radius(card, 8, 0);
+    lv_obj_set_style_pad_all(card, 6, 0);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+
     return card;
 }
 
-static lv_obj_t *make_label(lv_obj_t *parent, const char *txt,
-                             const lv_font_t *font, lv_color_t color,
-                             int x, int y)
+static lv_obj_t *label_create(lv_obj_t *parent, const char *txt,
+                              const lv_font_t *font, lv_color_t color,
+                              lv_align_t align, lv_coord_t x, lv_coord_t y)
 {
-    lv_obj_t *l = lv_label_create(parent);
-    lv_label_set_text(l, txt);
-    lv_obj_set_style_text_font(l, font, 0);
-    lv_obj_set_style_text_color(l, color, 0);
-    lv_obj_set_pos(l, x, y);
-    return l;
+    lv_obj_t *lbl = lv_label_create(parent);
+    lv_label_set_text(lbl, txt);
+    lv_obj_set_style_text_font(lbl, font, 0);
+    lv_obj_set_style_text_color(lbl, color, 0);
+    lv_obj_align(lbl, align, x, y);
+    return lbl;
 }
 
-static lv_obj_t *make_card_title(lv_obj_t *card, const char *txt, int w)
+/* ======================== UI 创建 (横屏 320x240 天气仪表板) ======================== */
+static void Weather_UI_Create(void)
 {
-    lv_obj_t *t = make_label(card, txt, FONT_TITLE, TITLE_FG, 0, 0);
-    lv_obj_set_size(t, w, 24);
-    lv_obj_set_style_bg_color(t, TITLE_BG, 0);
-    lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
-    lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_pad_top(t, 2, 0);
-    return t;
+    /* 屏幕背景 */
+    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all(lv_scr_act(), 0, 0);
+    lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
+
+    /* === 容器: 整个天气面板 (320x240, 可整体 hide/show) === */
+    g_weather_panel = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(g_weather_panel, 320, 240);
+    lv_obj_align(g_weather_panel, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_set_style_bg_color(g_weather_panel, COLOR_BG, 0);
+    lv_obj_set_style_bg_opa(g_weather_panel, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(g_weather_panel, 0, 0);
+    lv_obj_set_style_radius(g_weather_panel, 0, 0);
+    lv_obj_set_style_pad_all(g_weather_panel, 6, 0);
+    lv_obj_clear_flag(g_weather_panel, LV_OBJ_FLAG_SCROLLABLE);
+
+    /* === 顶部标题 (整宽) === */
+    label_create(g_weather_panel, "Weather Monitor",
+                 &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_MID, 0, 0);
+
+    /* ============================================================
+     * 横屏布局 (内容区 308x228, 左右两列):
+     *   左列 (x=0, w=160):  Hero 卡 (网络天气 + 大温度)
+     *   右列 (x=164, w=144):
+     *      - 详情卡 (湿度/风/气压)
+     *      - 本地室内卡 (温度/湿度/光照)
+     * ============================================================ */
+
+    /* === Hero 卡片 (网络天气主区, 156x196, x=0, y=20) === */
+    lv_obj_t *hero = card_create(g_weather_panel, COLOR_CARD,
+                                  156, 196,
+                                  LV_ALIGN_TOP_LEFT, 0, 20);
+
+    label_w_city = label_create(hero, "---",
+                                &lv_font_montserrat_16, COLOR_ACCENT,
+                                LV_ALIGN_TOP_LEFT, 0, 0);
+
+    label_w_temp = label_create(hero, "--.-",
+                                &lv_font_montserrat_28, COLOR_TEMP,
+                                LV_ALIGN_TOP_LEFT, 0, 28);
+    label_create(hero, "C", &lv_font_montserrat_16, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_LEFT, 100, 36);
+
+    label_w_cond = label_create(hero, "---",
+                                &lv_font_montserrat_16, COLOR_TEXT,
+                                LV_ALIGN_TOP_LEFT, 0, 80);
+
+    label_w_feel = label_create(hero, "Feels --.-",
+                                &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                                LV_ALIGN_TOP_LEFT, 0, 110);
+
+    /* hero 底部三列: 湿度/风/气压 (替代之前的 detail 卡) */
+    label_create(hero, "Humi", &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_LEFT, 0, 138);
+    label_w_humi = label_create(hero, "--%",
+                                &lv_font_montserrat_14, COLOR_HUMI,
+                                LV_ALIGN_TOP_LEFT, 0, 156);
+
+    label_create(hero, "Wind", &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_MID, -8, 138);
+    label_w_wind = label_create(hero, "---",
+                                &lv_font_montserrat_14, COLOR_WIND,
+                                LV_ALIGN_TOP_MID, -8, 156);
+
+    label_create(hero, "Pres", &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_RIGHT, 0, 138);
+    label_w_pres = label_create(hero, "----",
+                                &lv_font_montserrat_14, COLOR_PRES,
+                                LV_ALIGN_TOP_RIGHT, 0, 156);
+
+    /* === 本地传感器卡 (右列, 144x196, x=164, y=20) === */
+    lv_obj_t *local = card_create(g_weather_panel, COLOR_CARD_ALT,
+                                   144, 196,
+                                   LV_ALIGN_TOP_LEFT, 164, 20);
+
+    label_create(local, "INDOOR",
+                 &lv_font_montserrat_14, COLOR_ACCENT,
+                 LV_ALIGN_TOP_LEFT, 0, 0);
+
+    /* 三行: 温度 / 湿度 / 光照 */
+    /* Temp 行 */
+    label_create(local, "Temp", &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_LEFT, 0, 22);
+    label_l_temp = label_create(local, "--.-",
+                                &lv_font_montserrat_28, COLOR_TEMP,
+                                LV_ALIGN_TOP_LEFT, 0, 38);
+    label_create(local, "C", &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_LEFT, 100, 46);
+
+    /* Humi 行 */
+    label_create(local, "Humi", &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_LEFT, 0, 80);
+    label_l_humi = label_create(local, "--%",
+                                &lv_font_montserrat_20, COLOR_HUMI,
+                                LV_ALIGN_TOP_LEFT, 0, 96);
+
+    /* Lux 行 */
+    label_create(local, "Lux", &lv_font_montserrat_14, COLOR_TEXT_DIM,
+                 LV_ALIGN_TOP_LEFT, 0, 132);
+    label_l_lux  = label_create(local, "----",
+                                &lv_font_montserrat_20, COLOR_LUX,
+                                LV_ALIGN_TOP_LEFT, 0, 148);
 }
 
-static lv_obj_t *make_icon(lv_obj_t *parent, const lv_img_dsc_t *src, int x, int y)
+/* ======================== UI 更新 ======================== */
+static void Weather_UI_UpdateLocal(SensorData_t *data)
 {
-    lv_obj_t *img = lv_img_create(parent);
-    lv_img_set_src(img, src);
-    lv_obj_set_pos(img, x, y);
-    return img;
+    char buf[24];
+
+    int32_t t_int = data->temperature / 100;
+    int32_t t_dec = (data->temperature >= 0) ?
+                    (data->temperature % 100) / 10 :
+                    ((-data->temperature) % 100) / 10;
+    sprintf(buf, "%d.%d", (int)t_int, (int)t_dec);
+    if(label_l_temp) lv_label_set_text(label_l_temp, buf);
+
+    sprintf(buf, "%u%%", (unsigned int)(data->humidity / 100));
+    if(label_l_humi) lv_label_set_text(label_l_humi, buf);
+
+    sprintf(buf, "%u", (unsigned int)(data->lux_x100 / 100));
+    if(label_l_lux) lv_label_set_text(label_l_lux, buf);
 }
 
-/* ======================== UI 构建 ======================== */
-static void Weather_UI_Build(void)
-{
-    /* 独立屏幕 */
-    g_weather_screen = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(g_weather_screen, BG_COLOR, 0);
-    lv_obj_set_style_bg_opa(g_weather_screen, LV_OPA_COVER, 0);
-    lv_obj_set_style_pad_all(g_weather_screen, 0, 0);
-    lv_obj_clear_flag(g_weather_screen, LV_OBJ_FLAG_SCROLLABLE);
-
-    /* === 顶部状态条 (320x30) === */
-    /* WiFi 图标 (靠左) */
-    make_icon(g_weather_screen, &_WIFI_alpha_20x20, 6, 5);
-    /* WiFi 状态文字 */
-    label_wifi = make_label(g_weather_screen, "--",
-                             FONT_SMALL, TEXT_COLOR, 32, 8);
-    
-    /* 时间显示 (靠右，使用更大字体) */
-    label_time = make_label(g_weather_screen, "Time: --",
-                            FONT_TIME, TEXT_COLOR, 210, 5);  // 位置左移，留出空间
-
-    /* === 室内卡 (5,40) ~ (158,245), 153x200 === */
-    lv_obj_t *card_in = make_card(g_weather_screen, 5, 40, 153, 200);
-    make_card_title(card_in, "\xE5\xAE\xA4\xE5\x86\x85", 149);  /* 室内 UTF-8 */
-
-    /* 温度行: [温度计图标] 25 [°C图标] */
-    make_icon(card_in, &_temperature_alpha_40x40, 4, 30);
-    label_in_temp = make_label(card_in, "--",
-                                FONT_BIG, TEMP_COLOR, 50, 28);
-    make_icon(card_in, &_Celsius_alpha_25x25, 118, 42);
-
-    /* 湿度行: [湿度图标] 56 [%图标] */
-    make_icon(card_in, &_humidity_alpha_30x30, 8, 92);
-    label_in_humi = make_label(card_in, "--",
-                                FONT_BIG, HUMI_COLOR, 50, 88);
-    make_icon(card_in, &_percentage_alpha_26x26, 118, 100);
-
-    /* 城市名 - 放在湿度下方 */
-    label_in_city = make_label(card_in, "City: --",
-                                FONT_SMALL, TEXT_COLOR, 6, 152);
-    
-    /* 光照强度 - 放在城市名下方 */
-    label_in_lux = make_label(card_in, "Lux: --",
-                               FONT_SMALL, TEXT_COLOR, 6, 170);
-
-    /* === 室外卡 (162,40) ~ (315,245), 153x200 === */
-    lv_obj_t *card_out = make_card(g_weather_screen, 162, 40, 153, 200);
-    make_card_title(card_out, "\xE5\xAE\xA4\xE5\xA4\x96", 149);  /* 室外 UTF-8 */
-
-    /* 温度行 */
-    make_icon(card_out, &_temperature_alpha_40x40, 4, 30);
-    label_out_temp = make_label(card_out, "--",
-                                 FONT_BIG, TEMP_COLOR, 50, 28);
-    make_icon(card_out, &_Celsius_alpha_25x25, 118, 42);
-
-    /* 湿度行 */
-    make_icon(card_out, &_humidity_alpha_30x30, 8, 92);
-    label_out_humi = make_label(card_out, "--",
-                                 FONT_BIG, HUMI_COLOR, 50, 88);
-    make_icon(card_out, &_percentage_alpha_26x26, 118, 100);
-
-    /* 天气状况 + 体感温度 */
-    label_out_cond = make_label(card_out, "----",
-                                 FONT_SMALL, DIM_COLOR, 6, 152);
-    label_out_feel = make_label(card_out, "Feel --",
-                                 FONT_SMALL, DIM_COLOR, 6, 170);
-}
-
-/* ======================== UI 数据更新 ======================== */
-static void Weather_UI_UpdateLocal(const SensorData_t *d)
-{
-    char buf[32];
-
-    /* 更新温度 */
-    int t = (int)(d->temperature / 100);
-    snprintf(buf, sizeof(buf), "%d", t);
-    if(label_in_temp) lv_label_set_text(label_in_temp, buf);
-
-    /* 更新湿度 */
-    snprintf(buf, sizeof(buf), "%u", (unsigned)(d->humidity / 100));
-    if(label_in_humi) lv_label_set_text(label_in_humi, buf);
-
-    /* 更新光照强度 */
-    snprintf(buf, sizeof(buf), "Lux: %u", (unsigned)(d->lux_x100 / 100));
-    if(label_in_lux) lv_label_set_text(label_in_lux, buf);
-}
-
-static void Weather_UI_UpdateRemote(const WeatherInfo_t *w)
+static void Weather_UI_UpdateRemote(WeatherInfo_t *info)
 {
     char buf[40];
 
-    /* 更新室内卡的城市名 */
-    if(label_in_city) {
-        snprintf(buf, sizeof(buf), "%s", w->city[0] ? w->city : "----");
-        lv_label_set_text(label_in_city, buf);
+    if(label_w_city) lv_label_set_text(label_w_city, info->city);
+
+    int t = info->temp_x10;
+    int t_int = t / 10;
+    int t_dec = (t >= 0) ? (t % 10) : ((-t) % 10);
+    sprintf(buf, "%d.%d", t_int, t_dec);
+    if(label_w_temp) lv_label_set_text(label_w_temp, buf);
+
+    sprintf(buf, "%u%%", (unsigned int)info->humi);
+    if(label_w_humi) lv_label_set_text(label_w_humi, buf);
+
+    if(label_w_cond) lv_label_set_text(label_w_cond, info->cond);
+
+    if(label_w_feel) {
+        int f = info->feel_x10;
+        int f_int = f / 10;
+        int f_dec = (f >= 0) ? (f % 10) : ((-f) % 10);
+        sprintf(buf, "Feels %d.%d C", f_int, f_dec);
+        lv_label_set_text(label_w_feel, buf);
     }
-
-    /* 更新顶部时间显示（使用更大字体） */
-    if(label_time) {
-        if(w->time[0] != '\0') {
-            snprintf(buf, sizeof(buf), "%s", w->time);  // 只显示时间，不加 "Time:" 前缀节省空间
-        } else {
-            snprintf(buf, sizeof(buf), "%lu", (unsigned long)w->timestamp);
-        }
-        lv_label_set_text(label_time, buf);
+    if(label_w_wind) {
+        int w_int = info->wind_x10 / 10;
+        int w_dec = info->wind_x10 % 10;
+        sprintf(buf, "%s %d.%d", info->wdir, w_int, w_dec);
+        lv_label_set_text(label_w_wind, buf);
     }
-
-    /* 更新室外温度 */
-    int t = w->temp_x10 / 10;
-    snprintf(buf, sizeof(buf), "%d", t);
-    if(label_out_temp) lv_label_set_text(label_out_temp, buf);
-
-    /* 更新室外湿度 */
-    snprintf(buf, sizeof(buf), "%u", (unsigned)w->humi);
-    if(label_out_humi) lv_label_set_text(label_out_humi, buf);
-
-    /* 更新天气状况 */
-    if(label_out_cond) {
-        lv_label_set_text(label_out_cond, w->cond[0] ? w->cond : "----");
-    }
-
-    /* 更新体感温度 */
-    if(label_out_feel) {
-        int f = w->feel_x10 / 10;
-        snprintf(buf, sizeof(buf), "Feel %d C", f);
-        lv_label_set_text(label_out_feel, buf);
+    if(label_w_pres) {
+        sprintf(buf, "%u", (unsigned int)info->pres);
+        lv_label_set_text(label_w_pres, buf);
     }
 }
 
-/* WiFi 在线状态: 30 秒内收到过远程数据 = ON */
-static void Weather_UI_RefreshWifi(void)
-{
-    if(label_wifi == NULL) return;
-    if(last_remote_tick == 0) {
-        lv_label_set_text(label_wifi, "--");
-    } else if((xTaskGetTickCount() - last_remote_tick) < pdMS_TO_TICKS(30000)) {
-        lv_label_set_text(label_wifi, "ON");
-    } else {
-        lv_label_set_text(label_wifi, "OFF");
-    }
-}
-
-/* ======================== 屏幕模式切换 ======================== */
+/**
+ * @brief 应用显示模式: 控制摄像头 canvas / 天气面板可见性, 并切换 LCD 方向
+ *        - 摄像头模式: LCD 方向 1 (横屏 90°)
+ *        - 天气模式:   LCD 方向 3 (横屏 270°, 即相对摄像头模式 180° 翻转)
+ *        每次切换后整屏 invalidate, 让 LVGL 重绘以匹配新方向
+ */
 static void Weather_ApplyMode(DisplayMode_t mode)
 {
     if(mode == DISP_MODE_CAMERA) {
         LCD_direction(1);
-        if(g_cam_screen) lv_scr_load(g_cam_screen);
+        if(g_cam_canvas)    lv_obj_clear_flag(g_cam_canvas, LV_OBJ_FLAG_HIDDEN);
+        if(g_weather_panel) lv_obj_add_flag(g_weather_panel, LV_OBJ_FLAG_HIDDEN);
     } else { /* DISP_MODE_WEATHER */
         LCD_direction(3);
-        if(g_weather_screen) lv_scr_load(g_weather_screen);
+        if(g_cam_canvas)    lv_obj_add_flag(g_cam_canvas, LV_OBJ_FLAG_HIDDEN);
+        if(g_weather_panel) lv_obj_clear_flag(g_weather_panel, LV_OBJ_FLAG_HIDDEN);
     }
+    /* 强制整屏重绘, 让 LVGL 把当前画面按新方向刷一次 */
     lv_obj_invalidate(lv_scr_act());
+
     g_display_mode = mode;
 }
 
 /* ======================== 任务主体 ======================== */
 void Weather_Task(void *pvParameters)
 {
-    SensorData_t  sd;
-    WeatherInfo_t wi;
-    uint32_t last_sd_ts = 0;
-    uint32_t last_wi_ts = 0;
-    DisplayMode_t pending;
+    SensorData_t sensor_data;
+    WeatherInfo_t weather_info;
+    uint32_t last_sensor_ts = 0;
+    uint32_t last_weather_ts = 0;
+    DisplayMode_t pending_mode;
 
     (void)pvParameters;
 
-    /* 等 Camera_task 把 canvas 创建好 */
-    for(int i = 0; i < 30 && g_cam_canvas == NULL; i++) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-    g_cam_screen = (g_cam_canvas != NULL) ?
-                    lv_obj_get_screen(g_cam_canvas) : lv_scr_act();
+    /* 等待传感器/UART/Camera 任务初始化 (Camera 任务里创建 canvas) */
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
-    /* 创建天气屏幕 */
-    Weather_UI_Build();
+    /* 创建 UI (在摄像头 canvas 之后创建, 保证天气面板位于 canvas 上层) */
+    Weather_UI_Create();
 
-    /* 默认进入摄像头模式 */
-    Weather_ApplyMode(DISP_MODE_WEATHER);
+    /* 初始默认为摄像头模式: 隐藏天气面板, 显示 canvas */
+    Weather_ApplyMode(DISP_MODE_CAMERA);
 
     for(;;)
     {
-        /* 模式切换请求 */
-        if(DisplayMode_TakePending(&pending)) {
-            Weather_ApplyMode(pending);
+        /* === 处理 USART1 命令导致的模式切换 === */
+        if(DisplayMode_TakePending(&pending_mode)) {
+            Weather_ApplyMode(pending_mode);
         }
 
-        /* 本地传感器更新 */
+        /* === 更新本地传感器数据 (无论是否显示, 标签内容都保持新鲜) === */
         if(xSensorDataQueue != NULL &&
-           xQueuePeek(xSensorDataQueue, &sd, 0) == pdTRUE)
+           xQueuePeek(xSensorDataQueue, &sensor_data, 0) == pdTRUE)
         {
-            if(sd.timestamp != last_sd_ts) {
-                last_sd_ts = sd.timestamp;
-                Weather_UI_UpdateLocal(&sd);
+            if(sensor_data.timestamp != last_sensor_ts)
+            {
+                last_sensor_ts = sensor_data.timestamp;
+                uint32_t now = xTaskGetTickCount();
+                if((now - sensor_data.timestamp) < pdMS_TO_TICKS(3000))
+                {
+                    Weather_UI_UpdateLocal(&sensor_data);
+                }
             }
         }
 
-        /* 远程天气更新 */
+        /* === 更新远程天气数据 === */
         if(xWeatherQueue != NULL &&
-           xQueuePeek(xWeatherQueue, &wi, 0) == pdTRUE)
+           xQueuePeek(xWeatherQueue, &weather_info, 0) == pdTRUE)
         {
-            if(wi.timestamp != last_wi_ts) {
-                last_wi_ts = wi.timestamp;
-                last_remote_tick = xTaskGetTickCount();
-                Weather_UI_UpdateRemote(&wi);
+            if(weather_info.timestamp != last_weather_ts)
+            {
+                last_weather_ts = weather_info.timestamp;
+                Weather_UI_UpdateRemote(&weather_info);
             }
         }
-
-        Weather_UI_RefreshWifi();
 
         vTaskDelay(pdMS_TO_TICKS(100));
     }

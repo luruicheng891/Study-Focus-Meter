@@ -181,5 +181,6 @@
 .\stm32h723\freertos.o: ..\Freertos\include\queue.h
 .\stm32h723\freertos.o: ..\Sensor\AHT20.h
 .\stm32h723\freertos.o: ..\Task\WeatherTask.h
+.\stm32h723\freertos.o: ..\Task\AITask.h
 .\stm32h723\freertos.o: ..\Sensor\UART.h
 .\stm32h723\freertos.o: ..\Task\display_mode.h
