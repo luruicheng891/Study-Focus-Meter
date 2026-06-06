@@ -182,4 +182,5 @@
 .\stm32h723\weathertask.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
 .\stm32h723\weathertask.o: ..\LCD\lcd.h
 .\stm32h723\weathertask.o: ../Core/Inc/main.h
+.\stm32h723\weathertask.o: ..\GUI\LVGL_myGui\src\generated\gui_guider.h
 .\stm32h723\weathertask.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h

@@ -84,10 +84,11 @@ inclusion: auto
 - `'C'` / `'c'` → `DISP_MODE_CAMERA` (摄像头, 240×240 居中显示)
 - `'W'` / `'w'` → `DISP_MODE_WEATHER` (天气仪表板, 320×240 全屏, 180° 翻转)
 
-实现细节:
+实现细节 (V1.4):
 - `Task/display_mode.c` 提供 `g_display_mode` 全局变量、`DisplayMode_Request/TakePending()` API
 - ISR 只设标志位, 真正切换在 `Weather_Task` 主循环中调用 `Weather_ApplyMode()`
-- DCMI/DMA 始终运行, 通过 `LV_OBJ_FLAG_HIDDEN` 切换 canvas 与 weather panel 可见性
+- 摄像头屏与天气屏是两个独立的 `lv_obj_t *screen`, 通过 `lv_scr_load()` 整屏切换
+- DCMI/DMA 始终运行, Camera_task 仅在 `g_display_mode == DISP_MODE_CAMERA` 时刷 canvas
 - 切换后 `lv_obj_invalidate(lv_scr_act())` 强制整屏重绘
 
 ## 代码结构
@@ -98,11 +99,14 @@ Drivers/User/      - led, usart, sccb, dcmi_ov2640 驱动 (注: usart.c 中旧 f
 LCD/               - lcd.c, lcd_spi.c (SPI1 + DMA), lcd.h, lcd_spi.h
 Communication/     - I2C.c (软件模拟 PB8/PB9), MPU6050.c (保留, 实际在从机端)
 Sensor/            - AHT20.c/.h, BH1750.c/.h, UART.c/.h (USART3 + cJSON)
-Task/              - Camera.c/.h, SensorTask.c/.h, WeatherTask.c/.h,
+Task/              - Camera.c/.h, SensorTask.c/.h,
+                     WeatherTask.c/.h (320×240 仪表板, 复用 Gui Guider 字体/图标),
                      display_mode.c/.h (模式切换 + 非阻塞 fputc + USART1 IRQ)
 SYSTEM/            - TIM.c, TIM.h (TIM7 基本定时器, 为 LVGL 提供 1ms 心跳)
 LVGL/              - LVGL v8.3.11 源码 (启用 Montserrat 14/16/20/28 字体)
 LVGL/examples/porting/ - lv_port_disp.c (320×240 横屏配置), lv_port_indev.c
+GUI/LVGL_myGui/    - Gui Guider 工程 (NXP), 仅复用其 generated/ 中的字体与小图标
+                     custom/ 自定义组件 (数字时钟), generated/ 由 GUI 工具生成
 Freertos/          - FreeRTOS 内核源码
 MDK-ARM/           - Keil 工程文件, 启动文件, scatter file
 ```
@@ -137,7 +141,7 @@ USART1 命令通道
     └── 'C'/'W' → DisplayMode_Request() (设置 pending flag)
          └── Weather_Task 主循环 → Weather_ApplyMode()
               ├── LCD_direction(1 或 3)
-              ├── 切换 canvas / weather_panel hidden flag
+              ├── lv_scr_load(g_cam_screen 或 g_weather_screen)  (V1.4)
               └── lv_obj_invalidate(lv_scr_act())
 ```
 
@@ -187,4 +191,9 @@ typedef struct {
 23. **STM32H7 USART 寄存器位**: H7 是 FIFO 架构, 用 `USART_CR1_RXNEIE_RXFNEIE` 和 `USART_ISR_RXNE_RXFNE`, 不是 F1/F4 的 `USART_CR1_RXNEIE` / `USART_ISR_RXNE`。错误标志 (ORE/FE/NE/PE) 必须在 ISR 中通过 `ICR` 清除, 否则反复触发中断。
 24. **LCD 横屏方向**: `USE_HORIZONTAL = 1`, 横屏 320×240。模式切换时 `LCD_direction(1)` (摄像头) 或 `LCD_direction(3)` (天气, 180° 翻转)。切换后必须 `lv_obj_invalidate(lv_scr_act())` 强制 LVGL 重绘。
 25. **LVGL 字体**: 启用了 Montserrat 14/16/20/28 (lv_conf.h)。Montserrat 默认只含 ASCII (0x20–0x7F), 不要在标签里写 `°` 等扩展字符, 用 `C` 代替 `°C`。
-26. **显示模式切换的线程安全**: ISR 只调 `DisplayMode_Request()` 设标志, **绝对不**在 ISR 中调用 LVGL API。真正的 `lv_obj_add_flag/clear_flag` + `LCD_direction` 在 `Weather_Task` 主循环里 `Weather_ApplyMode()` 中执行。
+26. **显示模式切换的线程安全**: ISR 只调 `DisplayMode_Request()` 设标志, **绝对不**在 ISR 中调用 LVGL API。真正的 `LCD_direction` + `lv_scr_load` 在 `Weather_Task` 主循环里 `Weather_ApplyMode()` 中执行。
+27. **Gui Guider 资源集成 (V1.4)**: `GUI/LVGL_myGui/` 来自 NXP Gui Guider, 设计稿 480×320 与本机 320×240 屏幕不匹配, **不**调用 `setup_ui()`。`Task/WeatherTask.c` 手工搭 320×240 布局, 仅复用其字体 (SourceHanSerifSC_17 / Alatsi_25/50) 和小图标 (WiFi/温度计/湿度/百分号/摄氏度)。
+28. **Gui Guider 编译宏**: 工程必须定义 `LV_LVGL_H_INCLUDE_SIMPLE`, 否则 generated/images/*.c 的 `#include "lvgl/lvgl.h"` 找不到。Include Path 追加 `..\GUI\LVGL_myGui\src\generated;..\GUI\LVGL_myGui\src\custom`。
+29. **Gui Guider 中文字体子集限制**: `lv_font_SourceHanSerifSC_Regular_17` 仅含设计稿出现过的字 (含"室内"/"室外"等), 其它中文显示为方块。城市等中文需启用 `LV_FONT_SIMSUN_16_CJK` (代价 ~250KB Flash) 或继续以英文显示。
+30. **Keil .uvprojx 保护**: Keil IDE 持有工程会在保存/构建时覆盖磁盘上的 `.uvprojx`。手工编辑 XML (添加文件组、Include Path、Define) 前必须**关闭工程或退出 Keil**, 否则改动会被 IDE 缓存覆盖。
+31. **widgets_init.c 缺少 include**: Gui Guider 生成的 `widgets_init.c` 调用 `clock_count_12` / `lv_dclock_set_text_fmt` 但漏写 `#include "custom.h"`。本项目已手动补上, 重新生成 GUI 代码会丢失需重补。

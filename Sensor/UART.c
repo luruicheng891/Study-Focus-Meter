@@ -313,7 +313,8 @@ void Weather_RxTask(void *pvParameters)
             /* 安全地拷贝帧数据 (避免与中断竞争) */
             taskENTER_CRITICAL();
             local_len = rx_frame_len;
-            if(local_len > USART3_RX_BUFFER_SIZE) local_len = USART3_RX_BUFFER_SIZE;
+            if(local_len > USART3_RX_BUFFER_SIZE)
+							local_len = USART3_RX_BUFFER_SIZE;
             memcpy(local_buf, (const void *)rx_frame_buf, local_len);
             local_buf[local_len] = '\0';
             rx_frame_ready = 0;
