@@ -40,8 +40,8 @@ void MX_FREERTOS_Init(void)
     /* 摄像头任务: 采集 + 通知 LVGL 刷新, 栈 4KB */
     xTaskCreate(Camera_task, "Camera_task", 1024, NULL, osPriorityNormal, NULL);
 
-    /* AHT20 传感器任务 */
-    xTaskCreate(AHT20_Task, "AHT20_Task", 512, NULL, osPriorityNormal, NULL);
+    /* Sensor 传感器任务 */
+    xTaskCreate(Sensor_Task, "Sensor_Task", 512, NULL, osPriorityNormal, NULL);
 
     /* 温湿度 LVGL 显示任务: 从队列读取 AHT20 数据并更新 UI, 栈 2KB */
     xTaskCreate(Weather_Task, "Weather_Task", 512, NULL, osPriorityNormal, NULL);
