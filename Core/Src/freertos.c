@@ -19,6 +19,7 @@
 #include "UART.h"
 #include "display_mode.h"
 #include "lvgl.h"
+#include "touch_test.h"
 
 /* Private variables ---------------------------------------------------------*/
 
@@ -40,8 +41,8 @@ void MX_FREERTOS_Init(void)
     /* 摄像头任务: 采集 + 通知 LVGL 刷新, 栈 4KB */
     xTaskCreate(Camera_task, "Camera_task", 1024, NULL, osPriorityNormal, NULL);
 
-    /* AHT20 传感器任务 */
-    xTaskCreate(AHT20_Task, "AHT20_Task", 512, NULL, osPriorityNormal, NULL);
+    /* Sensor 传感器任务 */
+    xTaskCreate(Sensor_Task, "Sensor_Task", 512, NULL, osPriorityNormal, NULL);
 
     /* 温湿度 LVGL 显示任务: 从队列读取 AHT20 数据并更新 UI, 栈 2KB */
     xTaskCreate(Weather_Task, "Weather_Task", 512, NULL, osPriorityNormal, NULL);
@@ -51,6 +52,10 @@ void MX_FREERTOS_Init(void)
 
     /* AI推理任务: 预处理+模型推理+结果显示, 栈 12KB, 优先级低于普通任务 */
     xTaskCreate(AI_InferTask, "AI_Infer", 3072, NULL, osPriorityBelowNormal, &AI_TaskHandle);
+
+    /* XPT2046 触摸测试任务: 周期扫描, UART 打印坐标, LCD 画触摸点,
+     * 同时向 LVGL 注册 indev, 使按钮/控件可被触摸操作 */
+    TouchTest_Start();
 }
 
 /**
