@@ -17,11 +17,10 @@
 #include "task.h"
 #include "queue.h"
 #include <stdio.h>
-#include "MAX9814.h"
-
 
 /* 全局队列句柄 */
 QueueHandle_t xSensorDataQueue;
+QueueHandle_t xAHT20DataQueue;  /* 兼容旧接口 */
 
 /* BH1750 设备句柄 */
 static BH1750_Handle_t bh1750_dev;
@@ -44,7 +43,7 @@ static uint8_t I2C_Check_Device(uint8_t addr)
     return ack;
 }
 
-void Sensor_Task(void *pvParameters)
+void AHT20_Task(void *pvParameters)
 {
     SensorData_t sensor_data;
     AHT20_Data_t aht20_data;
@@ -58,8 +57,9 @@ void Sensor_Task(void *pvParameters)
 
     /* 创建队列 */
     xSensorDataQueue = xQueueCreate(1, sizeof(SensorData_t));
+    xAHT20DataQueue = xQueueCreate(5, sizeof(AHT20_Data_t));
 
-    if(xSensorDataQueue == NULL )
+    if(xSensorDataQueue == NULL || xAHT20DataQueue == NULL)
     {
         printf("[Sensor] ERROR: Failed to create queue!\r\n");
         vTaskDelete(NULL);
@@ -118,22 +118,7 @@ void Sensor_Task(void *pvParameters)
         printf("[Sensor] BH1750 Init FAILED (ret=%d)\r\n", ret);
         bh1750_online = 0;
     }
-		
-		  /* ========== 初始化 MAX9814 ========== */
-		{
-			uint8_t ret_max = MAX9814_ADC_Init();
-			if(ret_max == 0) {
-				printf("[Sensor] MAX9814 ADC Init OK (PA7, ADC2 CH7, DMA continuous)\r\n");
-				/* 等 DMA 填充缓冲, 读一次 DC 偏置验证 */
-				vTaskDelay(pdMS_TO_TICKS(10));
-				uint16_t dc = MAX9814_ADC_ReadAvg(0);
-				printf("[Sensor] MAX9814 DC bias avg: %u (expect ~24000-26000 @16bit)\r\n", dc);
-			} else {
-				printf("[Sensor] MAX9814 ADC Init FAILED (ret=%u)\r\n", ret_max);
-			}
-		}
-		
-		
+
     /* 检查是否至少有一个传感器在线 */
     if(!aht20_online && !bh1750_online)
     {
@@ -170,6 +155,8 @@ void Sensor_Task(void *pvParameters)
             sensor_data.temperature = aht20_data.temperature;
             sensor_data.humidity = aht20_data.humidity;
 
+            /* 发送到兼容队列 */
+            xQueueSend(xAHT20DataQueue, &aht20_data, 0);
         }
 
         /* 读取 BH1750 光照 */
@@ -185,13 +172,6 @@ void Sensor_Task(void *pvParameters)
                 printf("[Sensor] BH1750 read err=%d\r\n", ret);
             }
         }
-				
-				/*读取MAX9814的值 (百分比 0~100)*/
-				{
-					uint16_t dc = MAX9814_ADC_ReadAvg(0);
-					sensor_data.soundIntensity = MAX9814_GetSoundPercent(0);
-					printf("[Sound] dc=%u, pct=%u%%\r\n", dc, sensor_data.soundIntensity);
-				}
 
         /* 填充时间戳并发送综合数据 */
         sensor_data.timestamp = xTaskGetTickCount();

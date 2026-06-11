@@ -46,15 +46,11 @@ static uint8_t  s_gray_u8[AI_MODEL_INPUT_ELEMENTS];    /* 1024 bytes */
 
 /**
  * @brief 创建 AI 结果 LVGL 标签 (覆盖在摄像头画面上方)
- * @note  标签挂在 lv_layer_top() 上, 这样无论当前是摄像头还是天气屏,
- *        都能通过 lv_obj_clear_flag/add_flag 控制显隐
  */
 static void AI_CreateUI(void)
 {
-    lv_obj_t *parent = lv_layer_top();
-
     /* 识别结果大字 */
-    label_ai_result = lv_label_create(parent);
+    label_ai_result = lv_label_create(lv_scr_act());
     lv_label_set_text(label_ai_result, "AI: ---");
     lv_obj_set_style_text_color(label_ai_result, lv_color_hex(0x00FF00), 0);
     lv_obj_set_style_text_font(label_ai_result, &lv_font_montserrat_14, 0);
@@ -62,11 +58,9 @@ static void AI_CreateUI(void)
     lv_obj_set_style_bg_opa(label_ai_result, LV_OPA_50, 0);
     lv_obj_set_style_pad_all(label_ai_result, 2, 0);
     lv_obj_align(label_ai_result, LV_ALIGN_TOP_LEFT, 4, 4);
-    /* 初始隐藏, 进入摄像头模式后再显示 */
-    lv_obj_add_flag(label_ai_result, LV_OBJ_FLAG_HIDDEN);
 
     /* 概率详情 */
-    label_ai_probs = lv_label_create(parent);
+    label_ai_probs = lv_label_create(lv_scr_act());
     lv_label_set_text(label_ai_probs, "");
     lv_obj_set_style_text_color(label_ai_probs, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_font(label_ai_probs, &lv_font_montserrat_14, 0);
@@ -74,8 +68,6 @@ static void AI_CreateUI(void)
     lv_obj_set_style_bg_opa(label_ai_probs, LV_OPA_50, 0);
     lv_obj_set_style_pad_all(label_ai_probs, 2, 0);
     lv_obj_align(label_ai_probs, LV_ALIGN_TOP_LEFT, 4, 22);
-    /* 初始隐藏, 进入摄像头模式后再显示 */
-    lv_obj_add_flag(label_ai_probs, LV_OBJ_FLAG_HIDDEN);
 }
 
 /* ------------------------------------------------------------------ */
