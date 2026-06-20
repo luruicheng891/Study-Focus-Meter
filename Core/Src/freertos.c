@@ -15,11 +15,13 @@
 #include "Camera.h"
 #include "SensorTask.h"
 #include "WeatherTask.h"
+#include "Display.h"
 #include "AITask.h"
-#include "UART.h"
+#include "SlaveRxTask.h"
+#include "FusionTask.h"
 #include "display_mode.h"
 #include "lvgl.h"
-#include "touch_test.h"
+#include "TouchTask.h"
 
 /* Private variables ---------------------------------------------------------*/
 
@@ -44,18 +46,23 @@ void MX_FREERTOS_Init(void)
     /* Sensor 传感器任务 */
     xTaskCreate(Sensor_Task, "Sensor_Task", 512, NULL, osPriorityNormal, NULL);
 
-    /* 温湿度 LVGL 显示任务: 从队列读取 AHT20 数据并更新 UI, 栈 2KB */
-    xTaskCreate(Weather_Task, "Weather_Task", 512, NULL, osPriorityNormal, NULL);
+    /* LVGL 显示任务: 渲染天气仪表板 + 显示模式切换, 栈 2KB */
+    xTaskCreate(DisplayTask, "WeatherDisp", 512, NULL, osPriorityNormal, NULL);
 
     /* ESP-01 天气数据接收+解析任务 (USART3 + DMA + IDLE), 栈 2KB */
-    xTaskCreate(Weather_RxTask, "Weather_RxTask", 512, NULL, osPriorityNormal, NULL);
+    xTaskCreate(Weather_RxTask, "Weather_Rx", 512, NULL, osPriorityNormal, NULL);
+
+    /* ESP32 BLE 透传 (W02/PB-03F) IMU+压力数据接收任务 (USART2 + DMA + IDLE), 栈 2KB */
+    xTaskCreate(Slave_RxTask, "Slave_Rx", 512, NULL, osPriorityNormal, NULL);
 
     /* AI推理任务: 预处理+模型推理+结果显示, 栈 12KB, 优先级低于普通任务 */
     xTaskCreate(AI_InferTask, "AI_Infer", 3072, NULL, osPriorityBelowNormal, &AI_TaskHandle);
 
-    /* XPT2046 触摸测试任务: 周期扫描, UART 打印坐标, LCD 画触摸点,
-     * 同时向 LVGL 注册 indev, 使按钮/控件可被触摸操作 */
-    TouchTest_Start();
+    /* XPT2046 触摸任务: 20ms 周期扫描, 注册 LVGL indev, 串口命令支持, 栈 2KB */
+    xTaskCreate(Touch_Task, "Touch_Task", 512, NULL, osPriorityNormal, NULL);
+
+    /* Fusion 多模态融合任务: 1s 周期, 视觉40% + 坐姿30% + 环境20% + 时长10% */
+    xTaskCreate(Fusion_Task, "Fusion_Task", 1024, NULL, osPriorityLow, NULL);
 }
 
 /**

@@ -82,9 +82,14 @@ extern DMA_HandleTypeDef DMA_Handle_dcmi;
 extern DMA_HandleTypeDef hdma_spi1_tx;
 extern SPI_HandleTypeDef hlcd_spi;
 
-/* USART3 (ESP-01) DMA 接收 */
-extern DMA_HandleTypeDef hdma_usart3_rx;
+/* USART3 (ESP-01) 已迁移到 Communication/UART_ESP01.c
+ *   - hdma_usart3_rx 改为驱动内 static, 通过 huart3.hdmarx 访问 */
+extern UART_HandleTypeDef huart3;
 extern void USART3_IRQ_Handler(void);
+
+/* USART2 (ESP32 BLE 透传) DMA 接收 */
+extern UART_HandleTypeDef huart2;
+extern void USART2_IRQ_Handler(void);
 
 /* USART1 (调试 + 命令接收) */
 extern UART_HandleTypeDef huart1;
@@ -108,10 +113,35 @@ void USART3_IRQHandler(void)
 
 /**
   * @brief  DMA1_Stream1 中断 (USART3_RX 使用)
+  *         DMA 句柄通过 __HAL_LINKDMA 关联到 huart3.hdmarx, 此处直接访问。
   */
 void DMA1_Stream1_IRQHandler(void)
 {
-  HAL_DMA_IRQHandler(&hdma_usart3_rx);
+  if (huart3.hdmarx != NULL)
+  {
+    HAL_DMA_IRQHandler(huart3.hdmarx);
+  }
+}
+
+/**
+  * @brief  USART2 中断 (ESP32 BLE 透传, IDLE 检测)
+  */
+void USART2_IRQHandler(void)
+{
+  USART2_IRQ_Handler();
+}
+
+/**
+  * @brief  DMA1_Stream3 中断 (USART2_RX 使用)
+  *         驱动 huart2.hdmarx 通过 __HAL_LINKDMA 关联,
+  *         直接读 huart2.hdmarx 即可避免再 extern 一份句柄。
+  */
+void DMA1_Stream3_IRQHandler(void)
+{
+  if (huart2.hdmarx != NULL)
+  {
+    HAL_DMA_IRQHandler(huart2.hdmarx);
+  }
 }
 
 /**

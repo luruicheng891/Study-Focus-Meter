@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/Core/Inc",
+                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
+                "${workspaceFolder}/Drivers/CMSIS/Include",
+                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+                "${workspaceFolder}/Middlewares/.../Inc",
+                "${workspaceFolder}/LVGL/.../Inc"
+            ],
+            "defines": [
+                "USE_HAL_DRIVER",
+                "STM32H723xx        ← 改成你的芯片型号",
+                "__CC_ARM"
+            ],
+            "compilerPath": "D:\\Keil5\\ARM\\ARMCC\\bin\\armcc.exe",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

@@ -1,0 +1,15 @@
+.\stm32h723\timers.o: ..\Freertos\timers.c
+.\stm32h723\timers.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdlib.h
+.\stm32h723\timers.o: ..\Freertos\include\FreeRTOS.h
+.\stm32h723\timers.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stddef.h
+.\stm32h723\timers.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdint.h
+.\stm32h723\timers.o: ../Core/Inc/FreeRTOSConfig.h
+.\stm32h723\timers.o: ..\Freertos\include\projdefs.h
+.\stm32h723\timers.o: ..\Freertos\include\portable.h
+.\stm32h723\timers.o: ..\Freertos\include\deprecated_definitions.h
+.\stm32h723\timers.o: ..\Freertos\portable\RVDS\ARM_CM4F\portmacro.h
+.\stm32h723\timers.o: ..\Freertos\include\mpu_wrappers.h
+.\stm32h723\timers.o: ..\Freertos\include\task.h
+.\stm32h723\timers.o: ..\Freertos\include\list.h
+.\stm32h723\timers.o: ..\Freertos\include\queue.h
+.\stm32h723\timers.o: ..\Freertos\include\timers.h

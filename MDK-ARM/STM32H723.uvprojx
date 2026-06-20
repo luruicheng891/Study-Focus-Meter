@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32H723xx,LV_LVGL_H_INCLUDE_SIMPLE</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\Freertos;..\Freertos\CMSIS_RTOS_V2;..\Freertos\include;..\Freertos\portable\MemMang;..\Freertos\portable\RVDS\ARM_CM4F;..\LVGL;..\LVGL\src;..\Task;..\CJSON;..\Sensor;..\Communication;..\LVGL\examples\porting;..\LVGL;..\LVGL\src;..\LVGL\demos\widgets;..\SYSTEM;..\LCD;..\GUI\LVGL_myGui\src\generated;..\GUI\LVGL_myGui\src\custom;..\AI\Inc;..\Middlewares\ST\AI\Inc</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\Freertos;..\Freertos\CMSIS_RTOS_V2;..\Freertos\include;..\Freertos\portable\MemMang;..\Freertos\portable\RVDS\ARM_CM4F;..\LVGL;..\LVGL\src;..\Task;..\CJSON;..\Sensor;..\Communication;..\LVGL\examples\porting;..\LVGL;..\LVGL\src;..\LVGL\demos\widgets;..\SYSTEM;..\LCD;..\GUI\LVGL_myGui\src\generated;..\GUI\LVGL_myGui\src\custom;..\AI\Inc;..\Middlewares\ST\AI\Inc;..\Slave-device</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -575,11 +575,6 @@
               <FileType>1</FileType>
               <FilePath>..\LCD\touch.c</FilePath>
             </File>
-            <File>
-              <FileName>touch_test.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\LCD\touch_test.c</FilePath>
-            </File>
           </Files>
         </Group>
         <Group>
@@ -675,15 +670,45 @@
               <FileType>1</FileType>
               <FilePath>..\Task\AITask.c</FilePath>
             </File>
+            <File>
+              <FileName>SlaveRxTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\SlaveRxTask.c</FilePath>
+            </File>
+            <File>
+              <FileName>Display.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\Display.c</FilePath>
+            </File>
+            <File>
+              <FileName>TouchTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\TouchTask.c</FilePath>
+            </File>
+            <File>
+              <FileName>FusionTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\FusionTask.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
           <GroupName>Communication</GroupName>
           <Files>
             <File>
+              <FileName>UART_ESP01.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Communication\UART_ESP01.c</FilePath>
+            </File>
+            <File>
               <FileName>I2C.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Communication\I2C.c</FilePath>
+            </File>
+            <File>
+              <FileName>UART_ESP32.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Communication\UART_ESP32.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -749,11 +774,6 @@
               <FileName>BH1750.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Sensor\BH1750.c</FilePath>
-            </File>
-            <File>
-              <FileName>UART.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Sensor\UART.c</FilePath>
             </File>
             <File>
               <FileName>MAX9814.c</FileName>

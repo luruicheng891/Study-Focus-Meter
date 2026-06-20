@@ -7,14 +7,14 @@
   *            1. 初始化 CubeAI 模型
   *            2. 创建 LVGL 结果显示标签
   *            3. 循环等待 Camera_task 帧就绪通知
-  *            4. 预处理: 240x240 RGB565 → 32x32 灰度 uint8
-  *            5. 推理: 送入模型得到 3 类概率
+  *            4. 预处理: 240x240 RGB565 -> 32x32 灰度 uint8
+  *            5. 推理: 送入模型得到 3 类别概率
   *            6. 结果输出: 串口打印 + LVGL 标签更新
   *
   *          防竞争机制:
   *            - AI 读取 Canvas_Buffer (Camera_task memcpy 后的稳定副本)
   *            - 通过 TaskNotify 保证读取时机在 memcpy 之后
-  *            - 推理频率限制为 5fps, 不影响主显示帧率
+  *            - 推理频率限制为 2fps, 不影响主显示帧率
   ******************************************************************************
   */
 
@@ -38,7 +38,14 @@ TaskHandle_t AI_TaskHandle = NULL;
 static lv_obj_t *label_ai_result = NULL;
 static lv_obj_t *label_ai_probs  = NULL;
 
-/* 预处理中间缓冲 */
+/* 最新推理结果快照，供其他任务 (如 FusionTask) 使用
+ * 仅在推理成功后更新；通过临界区保护写者和读者 (不同任务)
+ */
+static float    s_latest_probs[3]    = {0.0f, 0.0f, 0.0f};
+static uint32_t s_latest_probs_tick  = 0;
+static uint8_t  s_latest_probs_valid = 0;
+
+/* 预处理中间缓存 */
 static float    s_gray_f32[AI_MODEL_INPUT_ELEMENTS];   /* 4096 bytes */
 static uint8_t  s_gray_u8[AI_MODEL_INPUT_ELEMENTS];    /* 1024 bytes */
 
@@ -46,7 +53,7 @@ static uint8_t  s_gray_u8[AI_MODEL_INPUT_ELEMENTS];    /* 1024 bytes */
 
 /**
  * @brief 创建 AI 结果 LVGL 标签 (覆盖在摄像头画面上方)
- * @note  标签挂在 lv_layer_top() 上, 这样无论当前是摄像头还是天气屏,
+ * @note  标签挂在 lv_layer_top() 上, 这样无论当前是摄像头还是天气层,
  *        都能通过 lv_obj_clear_flag/add_flag 控制显隐
  */
 static void AI_CreateUI(void)
@@ -112,7 +119,7 @@ void AI_InferTask(void *argument)
 
     while (1)
     {
-        /* 等待 Camera_task 帧就绪通知 (超时 1000ms 防死锁) */
+        /* 等待 Camera_task 帧就绪通知 (超时 1000ms 防止死锁) */
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
 
         /* 仅在摄像头模式下做推理 */
@@ -145,8 +152,17 @@ void AI_InferTask(void *argument)
         if (label >= 0) {
             const char *str = AI_LabelToStr(label);
 
+            /* 发布最新概率供 FusionTask / 其他任务使用 */
+            taskENTER_CRITICAL();
+            s_latest_probs[0]    = probs[0];
+            s_latest_probs[1]    = probs[1];
+            s_latest_probs[2]    = probs[2];
+            s_latest_probs_tick  = xTaskGetTickCount();
+            s_latest_probs_valid = 1;
+            taskEXIT_CRITICAL();
+
             /* 串口打印 */
-            printf("[AI] %s (F:%.1f%% D:%.1f%% T:%.1f%%)\r\n",
+            printf("[AI] %s (专注:%.1f%% 分心:%.1f%% 疲劳:%.1f%%)\r\n",
                    str,
                    (double)(probs[0] * 100.0f),
                    (double)(probs[1] * 100.0f),
@@ -155,7 +171,7 @@ void AI_InferTask(void *argument)
             /* 更新 LVGL 标签 */
             lv_label_set_text_fmt(label_ai_result, "AI: %s", str);
             lv_label_set_text_fmt(label_ai_probs,
-                "F:%.0f%% D:%.0f%% T:%.0f%%",
+                "专注:%.0f%% 分心:%.0f%% 疲劳:%.0f%%",
                 (double)(probs[0] * 100.0f),
                 (double)(probs[1] * 100.0f),
                 (double)(probs[2] * 100.0f));
@@ -164,4 +180,32 @@ void AI_InferTask(void *argument)
             lv_label_set_text(label_ai_result, "AI: ERR");
         }
     }
+}
+
+/* ------------------------------------------------------------------ */
+/*                          公共访问接口                                */
+/* ------------------------------------------------------------------ */
+
+int AI_GetLatestProbs(float probs_out[3], uint32_t *ts_tick)
+{
+    int valid;
+
+    taskENTER_CRITICAL();
+    valid = (s_latest_probs_valid != 0);
+    if (valid)
+    {
+        if (probs_out)
+        {
+            probs_out[0] = s_latest_probs[0];
+            probs_out[1] = s_latest_probs[1];
+            probs_out[2] = s_latest_probs[2];
+        }
+        if (ts_tick)
+        {
+            *ts_tick = s_latest_probs_tick;
+        }
+    }
+    taskEXIT_CRITICAL();
+
+    return valid ? 0 : -1;
 }
