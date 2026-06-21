@@ -18,6 +18,7 @@
   */
 
 #include "TouchTask.h"
+#include "ScreenSaver.h"   /* 触摸即唤醒息屏 */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "cmsis_os.h"
@@ -233,6 +234,14 @@ void Touch_Task(void *pvParameters)
         s_indev_pressed = pressed;
         s_indev_x       = x;
         s_indev_y       = y;
+
+        /* === 唤醒息屏 + 重置 3 分钟计时 ===
+         * 只要当前有触摸就调 NotifyActivity, 不用等到 DOWN 沿:
+         *   - 长按 / 持续触摸 也会持续重置计时, 不会中途息屏
+         *   - 哪怕 DOWN 沿因为什么错过 (抖动/竞态), 后面 iteration 也能唤醒 */
+        if (pressed) {
+            ScreenSaver_NotifyActivity();
+        }
 
         if (pressed && !prev_pressed) {
             /* 按下沿 */

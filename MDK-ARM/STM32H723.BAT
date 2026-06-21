@@ -1,7 +1,4 @@
 SET PATH=D:\Keil5\ARM\ARMCC\Bin;C:\Program Files (x86)\STMicroelectronics\stlink_server;D:\STM32CubeCLT\STM32CubeCLT_1.18.0;D:\STM32CubeCLT\STM32CubeCLT_1.18.0\CMake\bin;D:\STM32CubeCLT\STM32CubeCLT_1.18.0\Ninja\bin;D:\STM32CubeCLT\STM32CubeCLT_1.18.0\GNU-tools-for-STM32\bin;D:\STM32CubeCLT\STM32CubeCLT_1.18.0\STLink-gdb-server\bin;D:\STM32CubeCLT\STM32CubeCLT_1.18.0\STM32CubeProgrammer\bin;D:\VMware\bin\;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA NvDLISR;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files\PuTTY\;C:\Program Files\CMake\bin;C:\Program Files\dotnet\;D:\Git\Git\cmd;D:\Java_JDK\bin;E:\pandoc\;D:\ESP_Tools\tools\idf-python\3.11.2\Scripts;E:\python-3.10\Scripts\;E:\python-3.10\;C:\Espressif\tools\python;C:\Espressif\tools\python\Scripts;E:\ESP-IDF;D:\Python\Scripts\;D:\Python\;C:\Users\32150\AppData\Local\Microsoft\WindowsApps;D:\Vscode\Microsoft VS Code\bin;D:\IDEA\IntelliJ IDEA 2026.1\bin;D:\Clion\CLion 2026.1\bin;D:\Pycharm\PyCharm Community Edition 2025.2.6\bin;D:\Qoder\Qoder\bin;D:\Kiro\Kiro\bin;D:\Cursor\cursor\resources\app\bin;D:\ESP_Tools\tools\idf-python\3.11.2\Scripts;
-SET ARMCC5_ASMOPT=--diag_suppress=9931
-SET ARMCC5_CCOPT=--diag_suppress=9931
-SET ARMCC5_LINKOPT=--diag_suppress=9931
 SET CPU_TYPE=STM32H723ZGTx
 SET CPU_VENDOR=STMicroelectronics
 SET UV2_TARGET=STM32H723
@@ -60,6 +57,9 @@ SET CPU_CLOCK=0x017D7840
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\display.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\touchtask.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\fusiontask.__i"
+"D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\statetask.__i"
+"D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\learningscreen.__i"
+"D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\screensaver.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\uart_esp01.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\i2c.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\uart_esp32.__i"

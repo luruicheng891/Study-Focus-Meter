@@ -145,6 +145,8 @@
 .\stm32h723\display.o: ..\LVGL\src/extra/widgets/imgbtn/lv_imgbtn.h
 .\stm32h723\display.o: ..\LVGL\src/extra/widgets/span/lv_span.h
 .\stm32h723\display.o: ..\Task\display_mode.h
+.\stm32h723\display.o: ..\Task\StateTask.h
+.\stm32h723\display.o: ..\Task\LearningScreen.h
 .\stm32h723\display.o: ..\LCD\lcd.h
 .\stm32h723\display.o: ../Core/Inc/main.h
 .\stm32h723\display.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h

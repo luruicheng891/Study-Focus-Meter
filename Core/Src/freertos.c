@@ -19,6 +19,7 @@
 #include "AITask.h"
 #include "SlaveRxTask.h"
 #include "FusionTask.h"
+#include "StateTask.h"
 #include "display_mode.h"
 #include "lvgl.h"
 #include "TouchTask.h"
@@ -63,6 +64,9 @@ void MX_FREERTOS_Init(void)
 
     /* Fusion 多模态融合任务: 1s 周期, 视觉40% + 坐姿30% + 环境20% + 时长10% */
     xTaskCreate(Fusion_Task, "Fusion_Task", 1024, NULL, osPriorityLow, NULL);
+
+    /* 状态机任务: 200ms 周期, 监听压力/GUI 事件, 驱动 IDLE/LEARNING/AWAY/PAUSED/SUMMARY 转移 */
+    xTaskCreate(State_Task, "State_Task", 512, NULL, osPriorityNormal, NULL);
 }
 
 /**

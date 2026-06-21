@@ -690,6 +690,21 @@
               <FileType>1</FileType>
               <FilePath>..\Task\FusionTask.c</FilePath>
             </File>
+            <File>
+              <FileName>StateTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\StateTask.c</FilePath>
+            </File>
+            <File>
+              <FileName>LearningScreen.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\LearningScreen.c</FilePath>
+            </File>
+            <File>
+              <FileName>ScreenSaver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\ScreenSaver.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

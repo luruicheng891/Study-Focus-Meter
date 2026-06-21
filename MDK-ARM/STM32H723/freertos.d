@@ -185,5 +185,6 @@
 .\stm32h723\freertos.o: ..\Task\AITask.h
 .\stm32h723\freertos.o: ..\Task\SlaveRxTask.h
 .\stm32h723\freertos.o: ..\Task\FusionTask.h
+.\stm32h723\freertos.o: ..\Task\StateTask.h
 .\stm32h723\freertos.o: ..\Task\display_mode.h
 .\stm32h723\freertos.o: ..\Task\TouchTask.h

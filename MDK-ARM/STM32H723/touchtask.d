@@ -11,6 +11,7 @@
 .\stm32h723\touchtask.o: ..\Freertos\include\mpu_wrappers.h
 .\stm32h723\touchtask.o: ..\Freertos\include\task.h
 .\stm32h723\touchtask.o: ..\Freertos\include\list.h
+.\stm32h723\touchtask.o: ..\Task\ScreenSaver.h
 .\stm32h723\touchtask.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os.h
 .\stm32h723\touchtask.o: ..\Freertos\CMSIS_RTOS_V2\cmsis_os2.h
 .\stm32h723\touchtask.o: ../Core/Inc/main.h
