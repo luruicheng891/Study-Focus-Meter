@@ -1,0 +1,542 @@
+version: "4.1"
+name: STM32H723
+type: ARM
+deviceName: null
+packDir: null
+srcDirs: []
+virtualFolder:
+  name: <virtual_root>
+  files: []
+  folders:
+    - name: Application
+      files: []
+      folders:
+        - name: MDK-ARM
+          files: []
+          folders: []
+        - name: User
+          files: []
+          folders:
+            - name: Core
+              files:
+                - path: ../Core/Src/main.c
+                - path: ../Core/Src/stm32h7xx_it.c
+                - path: ../Core/Src/stm32h7xx_hal_msp.c
+                - path: ../Core/Src/freertos.c
+              folders: []
+    - name: Drivers
+      files: []
+      folders:
+        - name: User
+          files:
+            - path: ../Drivers/User/Src/led.c
+            - path: ../Drivers/User/Src/usart.c
+            - path: ../Drivers/User/Src/sccb.c
+            - path: ../Drivers/User/Src/dcmi_ov2640.c
+          folders: []
+        - name: STM32H7xx_HAL_Driver
+          files:
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_cortex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dcmi.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_gpio.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hsem.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_mdma.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_exti.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart_ex.c
+          folders: []
+        - name: CMSIS
+          files: []
+          folders: []
+    - name: LCD
+      files:
+        - path: ../LCD/lcd.c
+        - path: ../LCD/lcd_spi.c
+        - path: ../LCD/touch.c
+      folders: []
+    - name: Freertos
+      files:
+        - path: ../Freertos/croutine.c
+        - path: ../Freertos/event_groups.c
+        - path: ../Freertos/list.c
+        - path: ../Freertos/queue.c
+        - path: ../Freertos/stream_buffer.c
+        - path: ../Freertos/tasks.c
+        - path: ../Freertos/timers.c
+        - path: ../Freertos/portable/RVDS/ARM_CM4F/port.c
+        - path: ../Freertos/portable/MemMang/heap_4.c
+        - path: ../Freertos/CMSIS_RTOS_V2/cmsis_os2.c
+      folders: []
+    - name: SYSTEM
+      files:
+        - path: ../SYSTEM/TIM.c
+      folders: []
+    - name: Task
+      files:
+        - path: ../Task/Camera.c
+        - path: ../Task/WeatherTask.c
+        - path: ../Task/SensorTask.c
+        - path: ../Task/display_mode.c
+        - path: ../Task/AITask.c
+        - path: ../Task/SlaveRxTask.c
+        - path: ../Task/Display.c
+        - path: ../Task/TouchTask.c
+        - path: ../Task/FusionTask.c
+        - path: ../Task/StateTask.c
+        - path: ../Task/LearningScreen.c
+        - path: ../Task/LearningReport.c
+        - path: ../Task/Reminder.c
+        - path: ../Task/ScreenSaver.c
+      folders: []
+    - name: Communication
+      files:
+        - path: ../Communication/UART_ESP01.c
+        - path: ../Communication/I2C.c
+        - path: ../Communication/UART_ESP32.c
+      folders: []
+    - name: CJSON
+      files:
+        - path: ../CJSON/cJSON.c
+      folders: []
+    - name: AI
+      files:
+        - path: ../AI/Src/ai_task.c
+        - path: ../AI/Src/ai_preprocess.c
+        - path: ../AI/Src/network.c
+        - path: ../AI/Src/network_data.c
+        - path: ../AI/Src/network_data_params.c
+        - path: ../Middlewares/ST/AI/Lib/NetworkRuntime1020_CM7_Keil.lib
+      folders: []
+    - name: Sensor
+      files:
+        - path: ../Sensor/AHT20.c
+        - path: ../Sensor/MPU6050.c
+        - path: ../Sensor/BH1750.c
+        - path: ../Sensor/MAX9814.c
+      folders: []
+    - name: LVGL_conf
+      files:
+        - path: ../LVGL/lv_conf.h
+        - path: ../LVGL/lvgl.h
+      folders: []
+    - name: LVGL_porting
+      files:
+        - path: ../LVGL/examples/porting/lv_port_disp.c
+        - path: ../LVGL/examples/porting/lv_port_disp.h
+        - path: ../LVGL/examples/porting/lv_port_indev.c
+        - path: ../LVGL/examples/porting/lv_port_indev.h
+      folders: []
+    - name: LVGL_src
+      files:
+        - path: ../LVGL/src/core/lv_disp.c
+        - path: ../LVGL/src/core/lv_event.c
+        - path: ../LVGL/src/core/lv_group.c
+        - path: ../LVGL/src/core/lv_indev.c
+        - path: ../LVGL/src/core/lv_indev_scroll.c
+        - path: ../LVGL/src/core/lv_obj.c
+        - path: ../LVGL/src/core/lv_obj_class.c
+        - path: ../LVGL/src/core/lv_obj_draw.c
+        - path: ../LVGL/src/core/lv_obj_pos.c
+        - path: ../LVGL/src/core/lv_obj_scroll.c
+        - path: ../LVGL/src/core/lv_obj_style.c
+        - path: ../LVGL/src/core/lv_obj_style_gen.c
+        - path: ../LVGL/src/core/lv_obj_tree.c
+        - path: ../LVGL/src/core/lv_refr.c
+        - path: ../LVGL/src/core/lv_theme.c
+        - path: ../LVGL/src/draw/arm2d/lv_gpu_arm2d.c
+        - path: ../LVGL/src/draw/nxp/pxp/lv_draw_pxp.c
+        - path: ../LVGL/src/draw/nxp/pxp/lv_draw_pxp_blend.c
+        - path: ../LVGL/src/draw/nxp/pxp/lv_gpu_nxp_pxp.c
+        - path: ../LVGL/src/draw/nxp/pxp/lv_gpu_nxp_pxp_osa.c
+        - path: ../LVGL/src/draw/nxp/vglite/lv_draw_vglite.c
+        - path: ../LVGL/src/draw/nxp/vglite/lv_draw_vglite_arc.c
+        - path: ../LVGL/src/draw/nxp/vglite/lv_draw_vglite_blend.c
+        - path: ../LVGL/src/draw/nxp/vglite/lv_draw_vglite_line.c
+        - path: ../LVGL/src/draw/nxp/vglite/lv_draw_vglite_rect.c
+        - path: ../LVGL/src/draw/nxp/vglite/lv_vglite_buf.c
+        - path: ../LVGL/src/draw/nxp/vglite/lv_vglite_utils.c
+        - path: ../LVGL/src/draw/renesas/lv_gpu_d2_draw_label.c
+        - path: ../LVGL/src/draw/renesas/lv_gpu_d2_ra6m3.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_arc.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_bg.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_composite.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_img.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_label.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_layer.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_line.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_mask.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_polygon.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_rect.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_stack_blur.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_texture_cache.c
+        - path: ../LVGL/src/draw/sdl/lv_draw_sdl_utils.c
+        - path: ../LVGL/src/draw/stm32_dma2d/lv_gpu_stm32_dma2d.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_arc.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_blend.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_dither.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_gradient.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_img.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_layer.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_letter.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_line.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_polygon.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_rect.c
+        - path: ../LVGL/src/draw/sw/lv_draw_sw_transform.c
+        - path: ../LVGL/src/draw/swm341_dma2d/lv_gpu_swm341_dma2d.c
+        - path: ../LVGL/src/draw/lv_draw.c
+        - path: ../LVGL/src/draw/lv_draw_arc.c
+        - path: ../LVGL/src/draw/lv_draw_img.c
+        - path: ../LVGL/src/draw/lv_draw_label.c
+        - path: ../LVGL/src/draw/lv_draw_layer.c
+        - path: ../LVGL/src/draw/lv_draw_line.c
+        - path: ../LVGL/src/draw/lv_draw_mask.c
+        - path: ../LVGL/src/draw/lv_draw_rect.c
+        - path: ../LVGL/src/draw/lv_draw_transform.c
+        - path: ../LVGL/src/draw/lv_draw_triangle.c
+        - path: ../LVGL/src/draw/lv_img_buf.c
+        - path: ../LVGL/src/draw/lv_img_cache.c
+        - path: ../LVGL/src/draw/lv_img_decoder.c
+        - path: ../LVGL/src/extra/layouts/flex/lv_flex.c
+        - path: ../LVGL/src/extra/layouts/grid/lv_grid.c
+        - path: ../LVGL/src/extra/libs/bmp/lv_bmp.c
+        - path: ../LVGL/src/extra/libs/ffmpeg/lv_ffmpeg.c
+        - path: ../LVGL/src/extra/libs/freetype/lv_freetype.c
+        - path: ../LVGL/src/extra/libs/fsdrv/lv_fs_fatfs.c
+        - path: ../LVGL/src/extra/libs/fsdrv/lv_fs_littlefs.c
+        - path: ../LVGL/src/extra/libs/fsdrv/lv_fs_posix.c
+        - path: ../LVGL/src/extra/libs/fsdrv/lv_fs_stdio.c
+        - path: ../LVGL/src/extra/libs/fsdrv/lv_fs_win32.c
+        - path: ../LVGL/src/extra/libs/gif/gifdec.c
+        - path: ../LVGL/src/extra/libs/gif/lv_gif.c
+        - path: ../LVGL/src/extra/libs/png/lodepng.c
+        - path: ../LVGL/src/extra/libs/png/lv_png.c
+        - path: ../LVGL/src/extra/libs/qrcode/lv_qrcode.c
+        - path: ../LVGL/src/extra/libs/qrcode/qrcodegen.c
+        - path: ../LVGL/src/extra/libs/rlottie/lv_rlottie.c
+        - path: ../LVGL/src/extra/libs/sjpg/lv_sjpg.c
+        - path: ../LVGL/src/extra/libs/sjpg/tjpgd.c
+        - path: ../LVGL/src/extra/libs/tiny_ttf/lv_tiny_ttf.c
+        - path: ../LVGL/src/extra/others/fragment/lv_fragment.c
+        - path: ../LVGL/src/extra/others/fragment/lv_fragment_manager.c
+        - path: ../LVGL/src/extra/others/gridnav/lv_gridnav.c
+        - path: ../LVGL/src/extra/others/ime/lv_ime_pinyin.c
+        - path: ../LVGL/src/extra/others/imgfont/lv_imgfont.c
+        - path: ../LVGL/src/extra/others/monkey/lv_monkey.c
+        - path: ../LVGL/src/extra/others/msg/lv_msg.c
+        - path: ../LVGL/src/extra/others/snapshot/lv_snapshot.c
+        - path: ../LVGL/src/extra/themes/mono/lv_theme_mono.c
+        - path: ../LVGL/src/extra/themes/default/lv_theme_default.c
+        - path: ../LVGL/src/extra/themes/basic/lv_theme_basic.c
+        - path: ../LVGL/src/extra/widgets/animimg/lv_animimg.c
+        - path: ../LVGL/src/extra/widgets/calendar/lv_calendar.c
+        - path: ../LVGL/src/extra/widgets/calendar/lv_calendar_header_arrow.c
+        - path: ../LVGL/src/extra/widgets/calendar/lv_calendar_header_dropdown.c
+        - path: ../LVGL/src/extra/widgets/chart/lv_chart.c
+        - path: ../LVGL/src/extra/widgets/colorwheel/lv_colorwheel.c
+        - path: ../LVGL/src/extra/widgets/imgbtn/lv_imgbtn.c
+        - path: ../LVGL/src/extra/widgets/keyboard/lv_keyboard.c
+        - path: ../LVGL/src/extra/widgets/led/lv_led.c
+        - path: ../LVGL/src/extra/widgets/list/lv_list.c
+        - path: ../LVGL/src/extra/widgets/menu/lv_menu.c
+        - path: ../LVGL/src/extra/widgets/meter/lv_meter.c
+        - path: ../LVGL/src/extra/widgets/msgbox/lv_msgbox.c
+        - path: ../LVGL/src/extra/widgets/span/lv_span.c
+        - path: ../LVGL/src/extra/widgets/spinbox/lv_spinbox.c
+        - path: ../LVGL/src/extra/widgets/spinner/lv_spinner.c
+        - path: ../LVGL/src/extra/widgets/tabview/lv_tabview.c
+        - path: ../LVGL/src/extra/widgets/tileview/lv_tileview.c
+        - path: ../LVGL/src/extra/widgets/win/lv_win.c
+        - path: ../LVGL/src/extra/lv_extra.c
+        - path: ../LVGL/src/font/lv_font.c
+        - path: ../LVGL/src/font/lv_font_dejavu_16_persian_hebrew.c
+        - path: ../LVGL/src/font/lv_font_fmt_txt.c
+        - path: ../LVGL/src/font/lv_font_loader.c
+        - path: ../LVGL/src/font/lv_font_montserrat_8.c
+        - path: ../LVGL/src/font/lv_font_montserrat_10.c
+        - path: ../LVGL/src/font/lv_font_montserrat_12.c
+        - path: ../LVGL/src/font/lv_font_montserrat_12_subpx.c
+        - path: ../LVGL/src/font/lv_font_montserrat_14.c
+        - path: ../LVGL/src/font/lv_font_montserrat_16.c
+        - path: ../LVGL/src/font/lv_font_montserrat_18.c
+        - path: ../LVGL/src/font/lv_font_montserrat_20.c
+        - path: ../LVGL/src/font/lv_font_montserrat_22.c
+        - path: ../LVGL/src/font/lv_font_montserrat_24.c
+        - path: ../LVGL/src/font/lv_font_montserrat_26.c
+        - path: ../LVGL/src/font/lv_font_montserrat_28.c
+        - path: ../LVGL/src/font/lv_font_montserrat_28_compressed.c
+        - path: ../LVGL/src/font/lv_font_montserrat_30.c
+        - path: ../LVGL/src/font/lv_font_montserrat_32.c
+        - path: ../LVGL/src/font/lv_font_montserrat_34.c
+        - path: ../LVGL/src/font/lv_font_montserrat_36.c
+        - path: ../LVGL/src/font/lv_font_montserrat_38.c
+        - path: ../LVGL/src/font/lv_font_montserrat_40.c
+        - path: ../LVGL/src/font/lv_font_montserrat_42.c
+        - path: ../LVGL/src/font/lv_font_montserrat_44.c
+        - path: ../LVGL/src/font/lv_font_montserrat_46.c
+        - path: ../LVGL/src/font/lv_font_montserrat_48.c
+        - path: ../LVGL/src/font/lv_font_simsun_16_cjk.c
+        - path: ../LVGL/src/font/lv_font_unscii_8.c
+        - path: ../LVGL/src/font/lv_font_unscii_16.c
+        - path: ../LVGL/src/hal/lv_hal_disp.c
+        - path: ../LVGL/src/hal/lv_hal_indev.c
+        - path: ../LVGL/src/hal/lv_hal_tick.c
+        - path: ../LVGL/src/misc/lv_anim.c
+        - path: ../LVGL/src/misc/lv_anim_timeline.c
+        - path: ../LVGL/src/misc/lv_area.c
+        - path: ../LVGL/src/misc/lv_async.c
+        - path: ../LVGL/src/misc/lv_bidi.c
+        - path: ../LVGL/src/misc/lv_color.c
+        - path: ../LVGL/src/misc/lv_fs.c
+        - path: ../LVGL/src/misc/lv_gc.c
+        - path: ../LVGL/src/misc/lv_ll.c
+        - path: ../LVGL/src/misc/lv_log.c
+        - path: ../LVGL/src/misc/lv_lru.c
+        - path: ../LVGL/src/misc/lv_math.c
+        - path: ../LVGL/src/misc/lv_mem.c
+        - path: ../LVGL/src/misc/lv_printf.c
+        - path: ../LVGL/src/misc/lv_style.c
+        - path: ../LVGL/src/misc/lv_style_gen.c
+        - path: ../LVGL/src/misc/lv_templ.c
+        - path: ../LVGL/src/misc/lv_timer.c
+        - path: ../LVGL/src/misc/lv_tlsf.c
+        - path: ../LVGL/src/misc/lv_txt.c
+        - path: ../LVGL/src/misc/lv_txt_ap.c
+        - path: ../LVGL/src/misc/lv_utils.c
+        - path: ../LVGL/src/widgets/lv_arc.c
+        - path: ../LVGL/src/widgets/lv_bar.c
+        - path: ../LVGL/src/widgets/lv_btn.c
+        - path: ../LVGL/src/widgets/lv_btnmatrix.c
+        - path: ../LVGL/src/widgets/lv_canvas.c
+        - path: ../LVGL/src/widgets/lv_checkbox.c
+        - path: ../LVGL/src/widgets/lv_dropdown.c
+        - path: ../LVGL/src/widgets/lv_img.c
+        - path: ../LVGL/src/widgets/lv_label.c
+        - path: ../LVGL/src/widgets/lv_line.c
+        - path: ../LVGL/src/widgets/lv_objx_templ.c
+        - path: ../LVGL/src/widgets/lv_roller.c
+        - path: ../LVGL/src/widgets/lv_slider.c
+        - path: ../LVGL/src/widgets/lv_switch.c
+        - path: ../LVGL/src/widgets/lv_table.c
+        - path: ../LVGL/src/widgets/lv_textarea.c
+      folders: []
+    - name: LVGL_UI
+      files:
+        - path: ../GUI/LVGL_myGui/src/custom/custom.c
+        - path: ../GUI/LVGL_myGui/src/generated/gui_guider.c
+        - path: ../GUI/LVGL_myGui/src/generated/events_init.c
+        - path: ../GUI/LVGL_myGui/src/generated/setup_scr_screen_1.c
+        - path: ../GUI/LVGL_myGui/src/generated/widgets_init.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_WIFI_alpha_20x20.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_temperature_alpha_40x40.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_humidity_alpha_30x30.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_percentage_alpha_26x26.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_Celsius_alpha_25x25.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_Celsius_alpha_20x20.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_Sunny_Cloudy_alpha_88x67.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_low_alpha_30x50.c
+        - path: ../GUI/LVGL_myGui/src/generated/images/_high_alpha_30x50.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Antonio_Regular_25.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_25.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_30.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_50.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_75.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_SourceHanSerifSC_Regular_12.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_SourceHanSerifSC_Regular_17.c
+        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_SourceHanSerifSC_Regular_30.c
+      folders: []
+    - name: ::CMSIS
+      files: []
+      folders: []
+    - name: ::Device
+      files:
+        - path: RTE/Device/STM32H723ZGTx/startup_stm32h723xx.s
+        - path: RTE/Device/STM32H723ZGTx/system_stm32h7xx.c
+      folders: []
+dependenceList: []
+outDir: build
+miscInfo:
+  uid: 3125a4ae72e2c85fafaa87393b3a44c0
+targets:
+  STM32H723:
+    cppPreprocessAttrs:
+      defineList:
+        - USE_HAL_DRIVER
+        - STM32H723xx
+        - LV_LVGL_H_INCLUDE_SIMPLE
+      incList:
+        - ../Core/Inc
+        - ../Drivers/STM32H7xx_HAL_Driver/Inc
+        - ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy
+        - ../Drivers/CMSIS/Device/ST/STM32H7xx/Include
+        - ../Drivers/CMSIS/Include
+        - ../Drivers/User/Inc
+        - ../Freertos
+        - ../Freertos/CMSIS_RTOS_V2
+        - ../Freertos/include
+        - ../Freertos/portable/MemMang
+        - ../Freertos/portable/RVDS/ARM_CM4F
+        - ../LVGL
+        - ../LVGL/src
+        - ../Task
+        - ../CJSON
+        - ../Sensor
+        - ../Communication
+        - ../LVGL/examples/porting
+        - ../LVGL/demos/widgets
+        - ../SYSTEM
+        - ../LCD
+        - ../GUI/LVGL_myGui/src/generated
+        - ../GUI/LVGL_myGui/src/custom
+        - ../AI/Inc
+        - ../Middlewares/ST/AI/Inc
+        - ../Slave-device
+        - .cmsis/include
+        - RTE/_STM32H723
+      libList: []
+    excludeList: []
+    settings:
+      debugger: cortex-debug
+    toolchain: AC5
+    toolchainConfigMap:
+      AC5:
+        archExtensions: ""
+        cpuType: Cortex-M7
+        floatingPointHardware: double
+        options:
+          version: 4
+          afterBuildTasks: []
+          asm-compiler:
+            defines: []
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            CXX_FLAGS: --diag_suppress=1 --diag_suppress=1295
+            C_FLAGS: --diag_suppress=1 --diag_suppress=1295
+            c99-mode: true
+            one-elf-section-per-function: true
+            optimization: level-1
+            warnings: all-warnings
+          global:
+            output-debug-info: enable
+            use-microLIB: true
+          linker:
+            $disableOutputTask: false
+            $outputTaskExcludes:
+              - .bin
+              - .s19
+            output-format: elf
+            ro-base: ""
+            rw-base: ""
+            xo-base: ""
+        scatterFilePath: ""
+        storageLayout:
+          RAM:
+            - id: 1
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 2
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 3
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 1
+              isChecked: true
+              mem:
+                size: "0x20000"
+                startAddr: "0x20000000"
+              noInit: false
+              tag: IRAM
+            - id: 2
+              isChecked: false
+              mem:
+                size: "0x50000"
+                startAddr: "0x24000000"
+              noInit: false
+              tag: IRAM
+          ROM:
+            - id: 1
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 2
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 3
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 1
+              isChecked: true
+              isStartup: true
+              mem:
+                size: "0x100000"
+                startAddr: "0x8000000"
+              tag: IROM
+            - id: 2
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: IROM
+        useCustomScatterFile: false
+    uploadConfigMap:
+      JLink:
+        baseAddr: ""
+        bin: ""
+        cpuInfo:
+          cpuName: "null"
+          vendor: "null"
+        otherCmds: ""
+        proType: 1
+        speed: 8000
+      STLink:
+        address: "0x8000000"
+        bin: ""
+        elFile: None
+        optionBytes: .eide/stm32h723.st.option.bytes.ini
+        otherCmds: ""
+        proType: SWD
+        resetMode: default
+        runAfterProgram: true
+        speed: 4000
+    uploader: STLink

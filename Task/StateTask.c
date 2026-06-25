@@ -54,6 +54,12 @@ static uint32_t           s_focus_prob_sum_x100 = 0;
 static uint32_t           s_distract_prob_sum_x100 = 0;
 static uint32_t           s_fatigue_prob_sum_x100  = 0;
 
+/* 持续状态计时 (供 Reminder 模块查询: 持续分心/疲劳/坐姿异常多久了)
+ * 0 = 当前未处于该状态, 非零 = 进入该状态的 FreeRTOS tick */
+static TickType_t         s_distract_start_tick = 0;
+static TickType_t         s_fatigue_start_tick  = 0;
+static TickType_t         s_posture_bad_start_tick = 0;
+
 /* UI 秒表: 仅在 LEARNING 状态递增, PAUSED/AWAY 冻结 */
 static TickType_t         s_learning_resume_tick = 0;   /* 当前 LEARNING 段起点 (0=未在 LEARNING) */
 static uint32_t           s_learned_seconds      = 0;   /* 累计已学习秒数 (不含 PAUSED/AWAY) */
@@ -174,6 +180,36 @@ uint32_t State_GetElapsedSeconds(void)
     return total;
 }
 
+/* ======================== 持续状态查询 (供 Reminder 用) ======================== */
+
+/**
+  * @brief  计算"已持续 X 状态"的毫秒数, 状态未激活时返回 0
+  * @note   读 s_xxx_start_tick 由 update_session_stats 写入, 仅本任务更新;
+  *         Reminder 任务在另一上下文读取, FreeRTOS tick 为 32-bit 单调变量,
+  *         对齐保证由变量长度 (4 字节) 提供, 单字读在 ARM Cortex-M 上天然原子
+  */
+static uint32_t sustained_ms(TickType_t start_tick)
+{
+    if (start_tick == 0) return 0;
+    TickType_t now = xTaskGetTickCount();
+    return (uint32_t)((now - start_tick) * 1000U / configTICK_RATE_HZ);
+}
+
+uint32_t State_GetSustainedDistract(void)
+{
+    return sustained_ms(s_distract_start_tick);
+}
+
+uint32_t State_GetSustainedFatigue(void)
+{
+    return sustained_ms(s_fatigue_start_tick);
+}
+
+uint32_t State_GetSustainedPosture(void)
+{
+    return sustained_ms(s_posture_bad_start_tick);
+}
+
 /* ======================== BLE 命令发送 ======================== */
 
 /**
@@ -212,6 +248,9 @@ static void reset_session_stats(void)
     s_learned_seconds          = 0;
     s_picking                  = 0;
     s_target_minutes           = STATE_DEFAULT_DURATION_MIN;
+    s_distract_start_tick      = 0;
+    s_fatigue_start_tick       = 0;
+    s_posture_bad_start_tick   = 0;
 }
 
 /* ======================== 状态进入函数 ======================== */
@@ -574,8 +613,16 @@ static void check_time_complete(void)
   */
 static void update_session_stats(void)
 {
-    if (s_cur_state != ST_LEARNING) return;
+    if (s_cur_state != ST_LEARNING) {
+        /* 不在学习: 清空所有持续状态计时 */
+        s_distract_start_tick    = 0;
+        s_fatigue_start_tick     = 0;
+        s_posture_bad_start_tick = 0;
+        return;
+    }
     if (s_picking) return;  /* PICKING 状态不累加 */
+
+    TickType_t now = xTaskGetTickCount();
 
     /* 1. 融合结果 */
     FusionResult_t fr;
@@ -600,9 +647,21 @@ static void update_session_stats(void)
             s_fatigue_prob_sum_x100  += 0;
         }
         s_fusion_sample_count++;
+
+        /* 2. 持续分心 / 疲劳 计时 (>0.5 即视为激活该状态) */
+        if (fr.vision_prob_distract > 0.5f) {
+            if (s_distract_start_tick == 0) s_distract_start_tick = now;
+        } else {
+            s_distract_start_tick = 0;
+        }
+        if (fr.vision_prob_fatigue > 0.5f) {
+            if (s_fatigue_start_tick == 0) s_fatigue_start_tick = now;
+        } else {
+            s_fatigue_start_tick = 0;
+        }
     }
 
-    /* 2. 坐姿异常 (边沿检测) */
+    /* 3. 坐姿异常 (边沿检测 + 持续计时) */
     SlaveData_t sd;
     if (Slave_GetLatest(&sd) == 0)
     {
@@ -612,6 +671,12 @@ static void update_session_stats(void)
             s_summary.posture_abnormal_count++;
         }
         s_posture_was_bad = is_bad;
+
+        if (is_bad) {
+            if (s_posture_bad_start_tick == 0) s_posture_bad_start_tick = now;
+        } else {
+            s_posture_bad_start_tick = 0;
+        }
     }
 }
 

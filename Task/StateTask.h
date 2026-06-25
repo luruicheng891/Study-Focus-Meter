@@ -175,6 +175,25 @@ void State_SetMessage(const char *msg);
   */
 const char *State_GetMessage(uint32_t *age_ms);
 
+/**
+  * @brief  获取"分心"状态已持续的时间 (仅在 ST_LEARNING 累积)
+  * @retval 持续毫秒数, 0 = 当前未分心 或 不在学习状态
+  * @note   由 Reminder 模块调用, 用于判断"是否该弹分心提醒"
+  */
+uint32_t State_GetSustainedDistract(void);
+
+/**
+  * @brief  获取"疲劳"状态已持续的时间 (仅在 ST_LEARNING 累积)
+  * @retval 持续毫秒数, 0 = 当前未疲劳 或 不在学习状态
+  */
+uint32_t State_GetSustainedFatigue(void);
+
+/**
+  * @brief  获取"坐姿异常"已持续的时间 (仅在 ST_LEARNING 累积)
+  * @retval 持续毫秒数, 0 = 当前坐姿正常 或 不在学习状态
+  */
+uint32_t State_GetSustainedPosture(void);
+
 #ifdef __cplusplus
 }
 #endif

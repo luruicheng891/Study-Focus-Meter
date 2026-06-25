@@ -701,6 +701,16 @@
               <FilePath>..\Task\LearningScreen.c</FilePath>
             </File>
             <File>
+              <FileName>LearningReport.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\LearningReport.c</FilePath>
+            </File>
+            <File>
+              <FileName>Reminder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\Reminder.c</FilePath>
+            </File>
+            <File>
               <FileName>ScreenSaver.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\ScreenSaver.c</FilePath>

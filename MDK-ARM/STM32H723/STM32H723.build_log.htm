@@ -22,7 +22,7 @@ Dialog DLL:      TCM.DLL V1.56.6.0
  
 <h2>Project:</h2>
 E:\Desktop\AIÑ§Ï°×´Ì¬¼à²âÒÇ·ÖÎö\MDK-ARM\STM32H723.uvprojx
-Project File Date:  06/21/2026
+Project File Date:  06/24/2026
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.05 update 1 (build 106)', folder: 'D:\Keil5\ARM\ARMCC\Bin'
@@ -122,13 +122,15 @@ compiling SlaveRxTask.c...
   }
 ..\Task\SlaveRxTask.c: 9 warnings, 0 errors
 compiling Display.c...
-..\Task\Display.c(1030): warning:  #223-D: function "ScreenSaver_Tick" declared implicitly
+..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
+  #endif /* __FUSION_TASK_H */
+..\Task\Display.c(1031): warning:  #223-D: function "ScreenSaver_Tick" declared implicitly
           ScreenSaver_Tick();
-..\Task\Display.c(1133): warning:  #1-D: last line of file ends without a newline
+..\Task\Display.c(1143): warning:  #1-D: last line of file ends without a newline
   }
-..\Task\Display.c(381): warning:  #177-D: function "weather_switch_btn_event_cb" was declared but never referenced
+..\Task\Display.c(382): warning:  #177-D: function "weather_switch_btn_event_cb" was declared but never referenced
   static void weather_switch_btn_event_cb(lv_event_t *e)
-..\Task\Display.c: 3 warnings, 0 errors
+..\Task\Display.c: 4 warnings, 0 errors
 compiling TouchTask.c...
 compiling FusionTask.c...
 ..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
@@ -147,6 +149,10 @@ compiling StateTask.c...
   #endif /* __SLAVE_RX_TASK_H */
 ..\Task\StateTask.c: 2 warnings, 0 errors
 compiling LearningScreen.c...
+..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
+  #endif /* __FUSION_TASK_H */
+..\Task\LearningScreen.c: 1 warning, 0 errors
+compiling Reminder.c...
 compiling ScreenSaver.c...
 compiling UART_ESP01.c...
 compiling I2C.c...
@@ -455,8 +461,8 @@ compiling lv_font_SourceHanSerifSC_Regular_30.c...
 assembling startup_stm32h723xx.s...
 compiling system_stm32h7xx.c...
 linking...
-Program Size: Code=243126 RO-data=392430 RW-data=8260 ZI-data=125284  
-".\STM32H723\STM32H723.axf" - 0 Error(s), 55 Warning(s).
+Program Size: Code=246510 RO-data=333006 RW-data=8332 ZI-data=125516  
+".\STM32H723\STM32H723.axf" - 0 Error(s), 57 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -483,10 +489,10 @@ Package Vendor: Keil
       Source file:   CMSIS/UserCodeTemplates/ARM/ITM_Retarget.c
 
    * Component: Keil::Device:Startup@1.11.0
+      Source file:   Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/system_stm32h7xx.c
       Include file:  Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
       Source file:   Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/arm/startup_stm32h723xx.s
-      Source file:   Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/system_stm32h7xx.c
-Build Time Elapsed:  00:00:50
+Build Time Elapsed:  00:00:49
 </pre>
 </body>
 </html>

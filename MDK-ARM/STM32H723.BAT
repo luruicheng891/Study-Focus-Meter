@@ -59,6 +59,7 @@ SET CPU_CLOCK=0x017D7840
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\fusiontask.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\statetask.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\learningscreen.__i"
+"D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\reminder.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\screensaver.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\uart_esp01.__i"
 "D:\Keil5\ARM\ARMCC\Bin\ArmCC" --Via ".\stm32h723\i2c.__i"

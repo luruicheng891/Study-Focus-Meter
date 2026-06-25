@@ -97,16 +97,26 @@ void Camera_task(void *argument)
             /* 失效 DCache, 让 CPU 读到 DMA 写入的最新帧 */
             SCB_InvalidateDCache_by_Addr((uint32_t *)Camera_Buffer, Frame_Bytes);
 
-            /* 仅在摄像头模式下拷贝并触发重绘, 减少不必要的 LVGL 工作量 */
+            /* ===== 始终复制到 Canvas_Buffer + 通知 AI =====
+             * 原因: AITask 现在在所有显示模式下都跑推理, 用来:
+             *   - 持续通过 mailbox queue (s_q_fusion / s_q_debug) 分发结果
+             *   - 给 FusionTask 和 LearningScreen 调试面板提供实时数据
+             *   必须在每帧都给 AI 一份稳定副本 (memcpy 完才是稳定副本).
+             * DCMI 连续模式下每帧都会进这里 (~30fps), 复制成本可接受.
+             */
+            memcpy((void *)Canvas_Buffer, (void *)Camera_Buffer, Frame_Bytes);
+
+            /* 通知 AI 推理任务: 有新帧可处理 (非阻塞) */
+            if (AI_TaskHandle != NULL) {
+                xTaskNotifyGive(AI_TaskHandle);
+            }
+
+            /* ===== 仅 CAMERA 模式才触发 LVGL canvas 重绘 =====
+             * Weather/Learning 模式下不需要刷新 canvas (屏幕上看不到).
+             * 这样省下 lv_obj_invalidate 的开销, 同时保持数据通道畅通. */
             if(g_display_mode == DISP_MODE_CAMERA)
             {
-                memcpy((void *)Canvas_Buffer, (void *)Camera_Buffer, Frame_Bytes);
                 lv_obj_invalidate(g_cam_canvas);
-
-                /* 通知 AI 推理任务: 有新帧可处理 (非阻塞) */
-                if (AI_TaskHandle != NULL) {
-                    xTaskNotifyGive(AI_TaskHandle);
-                }
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
