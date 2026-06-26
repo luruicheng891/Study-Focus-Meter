@@ -84,6 +84,36 @@ int UART_ESP01_TakeFrame(uint8_t *buf, uint16_t max_len, uint16_t *out_len);
   */
 void UART_ESP01_GetStats(uint32_t *recv, uint32_t *drop);
 
+/* ============================ 发送 API ============================
+ *  通道契约 (重要, 请遵守):
+ *   - USART3 TX (PD8) 只用于发送"学习报告 JSON" 字节流到 ESP-01
+ *   - 一帧结束后追加 '\n' 作为帧结束符
+ *   - 频率 ≤ 1 次/会话, 当前用阻塞发送 (HAL_UART_Transmit, 100ms 超时)
+ *   - 绝对禁止: 用本 API 发送任何调试日志 / 文本 / "AT" 等控制指令
+ *   - 调试日志一律通过 printf -> USART1 (display_mode.c 里的 fputc) 输出
+ * ================================================================= */
+
+/**
+  * @brief  通过 USART3 发送一段原始字节到 ESP-01 (阻塞, 带超时)
+  * @param  data  要发送的数据指针
+  * @param  len   字节数
+  * @retval 0     成功
+  * @retval -1    超时 / HAL 错误
+  * @note   发送频率极低 (≤1次/分钟) 时用阻塞发送最简单;
+  *         如果将来频率提高, 改成 DMA + 空闲回调即可。
+  */
+int UART_ESP01_Send(const uint8_t *data, uint16_t len);
+
+/**
+  * @brief  通过 USART3 发送一个 C 字符串到 ESP-01 (不自动追加 '\n')
+  * @param  s  以 '\0' 结尾的字符串指针
+  * @retval 0  成功
+  * @retval -1 失败
+  * @note   末尾的换行由调用方自己加, 这样可以灵活支持多种帧格式
+  *         (例如 "AT\r\n" / "JSON\n" / "raw bytes" 等)。
+  */
+int UART_ESP01_SendString(const char *s);
+
 #ifdef __cplusplus
 }
 #endif

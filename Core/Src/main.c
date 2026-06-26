@@ -63,8 +63,10 @@ int main(void)
 	/* 初始化 USART1 (调试串口, printf 输出) */
 	USART1_Init();
 
-	/* 启动 USART1 单字节中断接收, 用于命令切换显示模式 ('C'/'W') */
+	/* 使能 USART1 NVIC, 供 TXE 中断 (printf 非阻塞发送) 使用 */
 	DisplayMode_StartUart1Rx();
+
+
 	
 	/* 初始化 LCD 硬件 */
 	LCD_Init();

@@ -55,6 +55,7 @@
 ".\stm32h723\fusiontask.o"
 ".\stm32h723\statetask.o"
 ".\stm32h723\learningscreen.o"
+".\stm32h723\learningreport.o"
 ".\stm32h723\reminder.o"
 ".\stm32h723\screensaver.o"
 ".\stm32h723\uart_esp01.o"

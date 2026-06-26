@@ -1,11 +1,11 @@
 /**
   ******************************************************************************
   * @file    display_mode.c
-  * @brief   屏幕显示模式运行时切换 + USART1 命令接收 + printf 非阻塞 TX
+  * @brief   屏幕显示模式运行时切换 + printf 非阻塞 TX
   *
-  *          USART1 (PA9 TX / PA10 RX, 115200) 命令字符:
-  *            'C' / 'c' → 切换到摄像头模式 (LCD 方向 1, 横屏)
-  *            'W' / 'w' → 切换到天气仪表板 (LCD 方向 3, 横屏 180° 翻转)
+  *          模式切换仅通过 DisplayMode_Request() (任务上下文, 例如按钮回调) 完成.
+  *          USART1 RX 命令通道已禁用, 不再响应 'C'/'W' 字符,
+  *          避免 RX 引脚悬空时的电气噪声误触发屏幕来回跳转.
   *
   *          为防止多任务并发 printf 导致 HAL_UART_Transmit 阻塞死锁,
   *          这里接管了 fputc, 改用环形缓冲 + TXE 中断的非阻塞实现:
@@ -106,50 +106,36 @@ int DisplayMode_TakePending(DisplayMode_t *out_mode)
 
 static void process_rx_byte(uint8_t b)
 {
-    char ch = (char)b;
-    switch(ch) {
-        case 'C': case 'c':
-            DisplayMode_Request(DISP_MODE_CAMERA);
-            break;
-        case 'W': case 'w':
-            DisplayMode_Request(DISP_MODE_WEATHER);
-            break;
-        default:
-            break;
-    }
+    /* USART1 RX 命令通道已禁用, 此函数保留为占位, 不再被调用. */
+    (void)b;
 }
 
 /* ============================ 启动 ============================ */
+/**
+ * @brief 使能 USART1 NVIC 中断, 供 TXE (printf 非阻塞发送) 使用.
+ *        RX 命令通道已移除, 此函数不碰 RX 相关寄存器.
+ *        在 main.c 中 USART1_Init() 之后调用.
+ */
 void DisplayMode_StartUart1Rx(void)
 {
-    /* 确保 USART1 接收使能并清错误标志 */
-    USART1->CR1 |= USART_CR1_RE;
-    USART1->ICR  = USART_ICR_ORECF | USART_ICR_FECF | USART_ICR_NECF |
-                   USART_ICR_PECF  | USART_ICR_IDLECF;
-
-    /* 使能 RXNE 中断 */
-    USART1->CR1 |= USART_CR1_RXNEIE_RXFNEIE;
-
-    /* 配置 NVIC (优先级 6, 在 FreeRTOS 安全范围内) */
+    /* 只使能 NVIC, 让 TXE 中断能进入 CPU (printf 环形缓冲依赖此中断)
+     * RXNEIE 保持 0 (HAL_UART_Init 默认不使能), 噪声不会触发中断 */
     HAL_NVIC_SetPriority(USART1_IRQn, 6, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
-
-    printf("[CMD] USART1 ready. 'C'=camera, 'W'=weather.\r\n");
 }
 
 /* ============================ USART1 IRQ ============================ */
+/**
+ * @brief USART1 中断入口: 仅处理 TXE (printf 发送), 不再处理 RX
+ *        (DisplayMode_StartUart1Rx 中已关闭 RXNEIE 和 NVIC).
+ *        保留这个 handler 是为了让 NVIC 表有合法入口, 万一其他代码
+ *        误触发 USART1 中断也不会跑飞.
+ */
 void USART1_IRQ_Handler(void)
 {
     USART_TypeDef *u = USART1;
     uint32_t isr = u->ISR;
     uint32_t cr1 = u->CR1;
-
-    /* === RX === */
-    if((isr & USART_ISR_RXNE_RXFNE) && (cr1 & USART_CR1_RXNEIE_RXFNEIE))
-    {
-        uint8_t b = (uint8_t)(u->RDR & 0xFFU);
-        process_rx_byte(b);
-    }
 
     /* === TX (TXE_TXFNF) === */
     if((isr & USART_ISR_TXE_TXFNF) && (cr1 & USART_CR1_TXEIE_TXFNFIE))

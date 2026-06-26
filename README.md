@@ -10,9 +10,32 @@
 - **环境监测**：AHT20 温湿度 + BH1750 光照 + MAX9814 麦克风音量
 - **姿态/压力 (无线节点)**：ESP32 + MPU6050 + 压力传感器 → BLE (W02 / PB-03F) → USART2 透传到主机
 - **网络天气**：ESP-01 (WiFi) → USART3 → cJSON 解析 → LVGL 仪表板
+- **多模态融合**：视觉 40% + 坐姿 30% + 环境 20% + 时长 10% → 0~100 学习质量评分 (FusionTask, 1s 周期)
+- **学习会话状态机**：IDLE / PICKING / LEARNING / AWAY / PAUSED / SUMMARY 六态 (StateTask)
+- **三屏交互**：主界面 (天气仪表板) → 学习界面 (LearningScreen) → 学习报告 (LearningReport)
+- **温和提醒 + 自动息屏**：Reminder 浮层提示 + ScreenSaver 背光管理
 - **GUI**：LVGL v8.3.11 + ILI9341 (320×240 横屏) + XPT2046 触摸
 - **运行时模式切换**：USART1 串口或屏幕按钮在「天气仪表板」与「摄像头预览」间切换
 - **调试通道**：USART1 (115200, 非阻塞 fputc + 单字节命令)
+
+## 界面流程与数据流 (主界面 → 学习状态 → 学习结束)
+
+```
+[主界面 天气仪表板/IDLE] --点Start--> [PICKING 选时长] --确认--> [学习界面 LEARNING]
+        ▲                                                              │
+        │ 点Back                              暂停/离开/压力恢复 在学习界面内切换
+        │                                                              │
+   [学习报告 SUMMARY] <--- End / 时长达成 / 离开5min超时 --------------- ┘
+```
+
+数据流核心:
+
+- 感知层 (持续运行): `AITask` (视觉概率) / `Sensor_Task` (温湿光声) / `Slave_RxTask` (姿态/压力) / `Weather_RxTask` (天气)
+- `Fusion_Task` (1s) 拉取上述数据 → 加权 `FusionResult_t` (total_score + 子分 + advice)
+- `State_Task` (200ms) 处理 GUI/超时事件、监测压力、累加 `SessionSummary_t`,状态切换时通过 USART2 向从机发送单字符指令 `A`(开始采集) / `Z`(停止采集) / `S`(休眠,预留)
+- `DisplayTask` (100ms) 按 `State_GetCurrent()` 切屏并实时刷新,进入 SUMMARY 时读 `State_GetSummary()` 推给学习报告
+
+> 完整状态转移图、时序与数据结构见 `项目架构.md` 的「界面流程与数据流」一节。
 
 ## 硬件接线
 
@@ -81,7 +104,13 @@ Task/             Camera        DCMI 采集 + canvas
                   SensorTask    本地传感器聚合
                   WeatherTask   天气 RX (USART3) 业务层
                   SlaveRxTask   姿态/压力 RX (USART2) 业务层
-                  Display       LVGL 仪表板 + 模式切换
+                  FusionTask    多模态融合评分 (视觉40+坐姿30+环境20+时长10)
+                  StateTask     学习会话状态机 (IDLE/PICKING/LEARNING/AWAY/PAUSED/SUMMARY)
+                  Display       三屏切换编排 (主界面/学习/报告) + 模式切换
+                  LearningScreen 学习专注界面 (秒表 + 双环 + 环境卡 + DBG 面板)
+                  LearningReport 学习结束报告页 (时长/平均分/占比/次数)
+                  Reminder      温和提醒浮层 (持续分心/疲劳/坐姿/45min)
+                  ScreenSaver   自动息屏 / 背光管理
                   AITask        CubeAI 推理
                   TouchTask     XPT2046 + LVGL indev
                   display_mode  模式状态 + USART1 fputc/RX

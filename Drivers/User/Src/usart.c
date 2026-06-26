@@ -167,15 +167,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 	}
 }
 
-/*************************************************************************************************
-*	以下代码用于解决半主机模式问题：
-*   LVGL可能需要__aeabi_assert，TouchGFX可能选择microLib，使用printf时需要适配
-*	添加以下代码，让标准C库支持重定向fputc
-*   根据编译环境选择对应的代码即可
-*************************************************************************************************/
 
-
-// AC5编译器使用如下代码
 #pragma import(__use_no_semihosting)    // 禁用半主机模式
 int _ttywrch(int ch)                    // 定义_ttywrch函数（AC5要求）
 {
@@ -196,36 +188,3 @@ void _sys_exit(int x)                   // 定义_sys_exit函数
 
 
 
-//// AC6编译器使用如下代码
-//__asm (".global __use_no_semihosting\n\t");  // 汇编声明：禁用半主机模式
-//void _sys_exit(int x)                         // 定义_sys_exit函数（避免链接错误）
-//{
-//  x = x;
-//}
-//// 注释：请求了__use_no_semihosting，但_ttywrch被调用了
-//void _ttywrch(int ch)                         // 定义_ttywrch函数（AC6要求）
-//{
-//    ch = ch;
-//}
-
-//FILE __stdout;                                // 定义标准输出文件
-
-
-
-/*************************************************************************************************
-*	函数功能: fputc - 重定向fputc函数，实现printf输出
-*	输入参数: ch - 要发送的字符, f - 文件指针（该参数未使用）
-*	返回值:   成功时返回字符，失败时返回EOF（-1）
-*	说明:     【已迁移】实际 fputc 实现位于 Task/display_mode.c, 改用环形缓冲 +
-*	          TXE 中断的非阻塞方式, 解决多任务并发 printf 阻塞死锁问题.
-*	          此处保留旧版本作参考, 已注释禁用.
-*************************************************************************************************/
-
-#if 0   /* 已被 display_mode.c 中的非阻塞 fputc 取代 */
-int fputc(int ch, FILE *f)
-{
-	// 通过USART1发送单个字符（阻塞模式，超时时间100ms）
-	HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 100);
-	return (ch);
-}
-#endif

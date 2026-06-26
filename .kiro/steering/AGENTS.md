@@ -133,7 +133,13 @@ Task/              - Camera        DCMI 采集 + LVGL canvas
                      SensorTask    AHT20 + BH1750 + MAX9814 聚合
                      WeatherTask   ESP-01 接收 + cJSON 解析 (业务层)
                      SlaveRxTask   ESP32 BLE 接收 + IMU/压力 JSON 解析 (业务层)
-                     Display       天气仪表板 LVGL UI + 模式切换主循环
+                     FusionTask    多模态融合评分 (视觉40+坐姿30+环境20+时长10), 1s
+                     StateTask     学习会话状态机 (IDLE/PICKING/LEARNING/AWAY/PAUSED/SUMMARY)
+                     Display       三屏切换编排 (主界面/学习/报告) + 模式切换主循环
+                     LearningScreen 学习专注界面 (秒表 + 双环 + 环境卡 + DBG 面板)
+                     LearningReport 学习结束报告页 (时长/平均分/占比/次数)
+                     Reminder      温和提醒浮层 (持续分心/疲劳/坐姿/45min)
+                     ScreenSaver   自动息屏 / 背光管理
                      AITask        CubeAI 推理
                      TouchTask     XPT2046 + LVGL indev 注册 + 校准
                      display_mode  模式切换状态 + 非阻塞 fputc + USART1 RX IRQ
@@ -162,7 +168,16 @@ void  USARTx_IRQ_Handler(void);
 void  UART_xxx_BindRxTask(TaskHandle_t handle);
 int   UART_xxx_TakeFrame(uint8_t *buf, uint16_t max_len, uint16_t *out_len);
 void  UART_xxx_GetStats(uint32_t *recv, uint32_t *drop);
+/* 可选: 需要向对端下发指令的链路 (如 ESP32) 增加发送 API */
+int   UART_xxx_SendBytes(const uint8_t *data, uint16_t len);
+int   UART_xxx_SendByte(uint8_t cmd);
 ```
+
+> `UART_ESP32` 已实现上述发送 API (TX 与 RX DMA 互不干扰); 业务层 `SlaveRxTask` 在其上封装了
+> `Slave_SendCmd()` / `Slave_StartReceive()` / `Slave_StopReceive()` / `Slave_Sleep()` 及
+> `SLAVE_CMD_START/STOP/SLEEP` ('A'/'Z'/'S') 协议宏。
+> 调试: `UART_ESP32.c` / `UART_ESP01.c` 内有 `ESP32_RX_DEBUG` / `ESP01_RX_DEBUG` 开关, 置 1 时
+> 每收到一帧即通过 USART1 (printf) 打印原始内容, 用于排查"收不到/解析不到"问题, 排查完置 0。
 
 业务层暴露的消费 API 风格:
 ```c
@@ -185,6 +200,58 @@ void Xxx_GetStats(uint32_t *recv, uint32_t *drop, uint32_t *parse_err);
 | Slave_RxTask | Slave_RxTask() | 512 words | Normal | ESP32 USART2 帧 → cJSON → 队列 |
 | AI_Infer | AI_InferTask() | 3072 words | BelowNormal | CubeAI 推理 |
 | Touch_Task | Touch_Task() | 512 words | Normal | XPT2046 扫描 + LVGL indev + 校准命令 |
+| Fusion_Task | Fusion_Task() | 1024 words | Low | 多模态融合评分, 1s 周期 (视觉40+坐姿30+环境20+时长10) |
+| State_Task | State_Task() | 512 words | Normal | 学习会话状态机, 200ms 周期 (IDLE/PICKING/LEARNING/AWAY/PAUSED/SUMMARY) |
+
+> `LearningScreen` / `LearningReport` / `Reminder` / `ScreenSaver` 是纯 UI/逻辑模块, 无独立任务, 由 `DisplayTask` 主循环驱动。
+
+## 界面流程与数据流 (主界面 → 学习状态 → 学习结束)
+
+`DisplayTask` 按 `State_GetCurrent()` 在三块屏幕间切换 (统一 `LCD_direction(3)`):
+
+| 状态 | 屏幕 | 说明 |
+|------|------|------|
+| `ST_IDLE` | 天气仪表板 (`g_weather_screen`) | **主界面**, 控制条 "Start" 入口 |
+| `ST_PICKING` | 学习界面 + 时长 Picker | 选 5~120min 目标时长 |
+| `ST_LEARNING` / `ST_PAUSED` / `ST_AWAY` | 学习界面 (`LearningScreen`) | **学习状态**, 实时监测 (PAUSED/AWAY 秒表冻结) |
+| `ST_SUMMARY` | 学习报告 (`LearningReport`) | **学习结束**, 统计页 |
+
+事件驱动: GUI 按钮/Picker 经 `State_PostEvent()` 投递 `STATE_EVT_GUI_*`; `StateTask`
+内部轮询压力/计时投递 `PRESSURE_LOST/BACK`、`AWAY_TIMEOUT`、`TIME_COMPLETE`。
+
+端到端数据流:
+```
+AITask(视觉) / Sensor_Task(温湿光声) / Slave_RxTask(姿态压力) / Weather_RxTask(天气)
+   │ (各自非阻塞 GetLatest / 队列 peek)
+   ▼
+Fusion_Task (1s)  视觉40%+坐姿30%+环境20%+时长10% → FusionResult_t (长度1队列)
+   │ Fusion_GetLatest                            │ Slave_GetLatest
+   ▼                                              ▼
+State_Task (200ms)  事件处理 + 压力监测 + 倒计时 + 累加 SessionSummary_t
+   │ 状态切换时 USART2 向从机发单字符指令 A/Z/S (确认时长进入LEARNING→A, 暂停/结束→Z, 休眠预留S)
+   ▼ State_GetCurrent / State_GetSummary / State_GetElapsedSeconds
+DisplayTask (100ms)  切屏 + LearningScreen_Update* + 进入SUMMARY→LearningReport_Update
+                     每帧 Reminder_Poll + ScreenSaver_Tick
+```
+
+关键阈值 (StateTask 宏): 压力阈值 5.0; 压力消失 30s → AWAY; AWAY 5min → 自动结束(auto=1);
+时长达成 → 自动结束(auto=2); 手动 End → auto=0。
+
+主机 → 从机控制指令 (USART2, **单字符协议**, 由 `SlaveRxTask` 业务层 `Slave_SendCmd()` 封装,
+底层 `UART_ESP32_SendByte()` 阻塞发送):
+- `'A'` (`SLAVE_CMD_START`): 开始采集/上报。在**确认时长进入 LEARNING** 时发送 (PICKING→LEARNING,
+  以及 PAUSED/AWAY 回到 LEARNING 时重发)。
+- `'Z'` (`SLAVE_CMD_STOP`): 停止采集/上报。在**暂停 (PAUSED)** 与**学习结束 (SUMMARY)** 时发送。
+- `'S'` (`SLAVE_CMD_SLEEP`): 休眠, 预留接口 (`Slave_Sleep()`), 触发时机由上层决定。
+
+在位校验时机 (重要): 点 Start **不**校验是否有人, 直接进入 PICKING 选时长; 真正的"椅子上有没有人"
+判断放在**确认时长 (CONFIRM_DURATION)** 时——压力 > 5.0 或无 BLE 数据(调试模式)才进入 LEARNING,
+否则提示 "Please sit on chair" 并退回 IDLE。CONFIRM_DURATION 还会应用 Picker 选中的分钟数到
+`s_target_minutes`。
+
+姿态评分 (FusionTask `score_posture`): 综合从机 `score` + `state` + `pressure` 三项——压力 < 5.0
+判离座直接 0 分; `state` 含 absent/away→0, distract→×0.6, fatigue/tired→×0.5, 其余用原分;
+结果计入总分的坐姿 30% 权重。
 
 ## 数据流
 
@@ -250,15 +317,40 @@ typedef struct {
     uint32_t timestamp;
 } WeatherInfo_t;
 
-/* 从机 IMU + 压力 (SlaveRxTask) */
+/* 从机姿态 + 压力 (SlaveRxTask, 新 JSON 协议)
+ * {"ts":..,"state":"focused","score":85,"pressure":45.2} */
 typedef struct {
-    uint64_t ts;            // ESP32 端毫秒时间戳
-    float    ax, ay, az;    // 加速度 g
-    float    gx, gy, gz;    // 角速度 dps
-    float    press;         // 气压 kPa
-    uint32_t local_tick;    // 本机接收时刻
-    uint32_t seq;           // 累计帧序号
+    uint64_t ts;                 // ESP32 端毫秒时间戳
+    char     state[16];          // 姿态状态字符串 ("focused"/"distracted"/...)
+    int32_t  score;              // 姿态评分 0..100
+    float    pressure;           // 座椅/应变压力值
+    uint32_t local_tick;         // 本机接收时刻
+    uint32_t seq;                // 累计帧序号
 } SlaveData_t;
+
+/* 多模态融合结果 (FusionTask, 1s 周期, 长度1队列) */
+typedef struct {
+    uint8_t  total_score;        // 加权总分 0..100
+    uint8_t  vision_score, posture_score, env_score, duration_score;
+    uint8_t  env_temp_score, env_humi_score, env_lux_score, env_noise_score;
+    float    vision_prob_focus, vision_prob_distract, vision_prob_fatigue;
+    char     posture_state[16];  float pressure;
+    int32_t  temperature_c100;   uint32_t humidity_x100, lux_x100;
+    uint16_t sound_pct;          uint32_t study_minutes;
+    uint32_t flags;              char advice[64];
+    uint32_t timestamp, seq;
+} FusionResult_t;
+
+/* 学习会话统计 (StateTask 结束时填好 → LearningReport) */
+typedef struct {
+    uint32_t total_seconds;          // 实际学习时长
+    uint16_t target_seconds;         // 目标时长 (0=无目标)
+    uint8_t  avg_total_score;        // 平均总分
+    uint8_t  focus_pct, distract_pct, fatigue_pct;
+    uint8_t  posture_abnormal_count; // 坐姿异常次数 (边沿计数)
+    uint32_t away_count, pause_count;
+    uint8_t  auto_ended;             // 0=手动 1=5min离开 2=时长达成
+} SessionSummary_t;                  // == LearningReport 的 LRSessionData_t
 ```
 
 ## 编码规范
@@ -267,7 +359,7 @@ typedef struct {
 - 编译器选项: `--c99 --cpu Cortex-M7.fp.dp -D__MICROLIB -g -O1 --apcs=interwork --split_sections`
 - 使用 MicroLib (轻量 C 库)
 - HAL 库风格: 使用 `HAL_xxx` API, 不直接操作寄存器 (除非性能关键路径或 H7 特有 FIFO 位)
-- 命名: 模块前缀 (LCD_, OV2640_, AHT20_, BH1750_, I2C_, SCCB_, TIM7_, UART_ESP01_, UART_ESP32_, Weather_, Slave_, Touch_, Display_)
+- 命名: 模块前缀 (LCD_, OV2640_, AHT20_, BH1750_, I2C_, SCCB_, TIM7_, UART_ESP01_, UART_ESP32_, Weather_, Slave_, Touch_, Display_, Fusion_, State_, LearningScreen_, LearningReport_, Reminder_, ScreenSaver_)
 - 注释: 中文注释为主, 函数头用 Doxygen 风格
 - 文件统一 UTF-8 编码 (避免 GBK 在多平台下乱码)
 

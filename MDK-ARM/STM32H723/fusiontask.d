@@ -12,9 +12,9 @@
 .\stm32h723\fusiontask.o: ..\Freertos\include\task.h
 .\stm32h723\fusiontask.o: ..\Freertos\include\list.h
 .\stm32h723\fusiontask.o: ..\Task\AITask.h
+.\stm32h723\fusiontask.o: ..\Freertos\include\queue.h
 .\stm32h723\fusiontask.o: ..\Task\SlaveRxTask.h
 .\stm32h723\fusiontask.o: ..\Task\SensorTask.h
-.\stm32h723\fusiontask.o: ..\Freertos\include\queue.h
 .\stm32h723\fusiontask.o: ..\Sensor\AHT20.h
 .\stm32h723\fusiontask.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
 .\stm32h723\fusiontask.o: D:\Keil5\ARM\ARMCC\Bin\..\include\string.h

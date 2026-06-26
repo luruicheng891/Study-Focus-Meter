@@ -148,6 +148,7 @@
 .\stm32h723\display.o: ..\Task\StateTask.h
 .\stm32h723\display.o: ..\Task\FusionTask.h
 .\stm32h723\display.o: ..\Task\LearningScreen.h
+.\stm32h723\display.o: ..\Task\LearningReport.h
 .\stm32h723\display.o: ..\LCD\lcd.h
 .\stm32h723\display.o: ../Core/Inc/main.h
 .\stm32h723\display.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h

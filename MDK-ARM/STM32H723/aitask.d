@@ -11,6 +11,7 @@
 .\stm32h723\aitask.o: ..\Freertos\include\mpu_wrappers.h
 .\stm32h723\aitask.o: ..\Freertos\include\task.h
 .\stm32h723\aitask.o: ..\Freertos\include\list.h
+.\stm32h723\aitask.o: ..\Freertos\include\queue.h
 .\stm32h723\aitask.o: ..\AI\Inc\ai_task.h
 .\stm32h723\aitask.o: ..\AI\Inc\ai_preprocess.h
 .\stm32h723\aitask.o: ..\AI\Inc\model_config.h

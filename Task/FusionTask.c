@@ -36,6 +36,11 @@
 
 #define FUSION_PERIOD_MS        1000u
 
+/* 姿态评分相关阈值:
+ *   压力低于此值视为"离座"(与 StateTask 的 STATE_PRESSURE_THRESHOLD 保持一致),
+ *   离座时姿态分直接归零, 避免从机仍上报较高 score 误导总分。 */
+#define FUSION_PRESSURE_PRESENT_TH   5.0f
+
 /* 长度为 1 的队列: 生产者使用 xQueueOverwrite，消费者使用 peek/recv */
 static QueueHandle_t s_queue = NULL;
 
@@ -121,11 +126,52 @@ static uint8_t score_vision(const float probs[3])
 }
 
 /**
-  * @brief  直接使用从机的评分字段作为姿态子评分
+  * @brief  综合从机数据 (score + state + pressure) 计算姿态子评分
+  *
+  *  把从机上报的三项数据全部纳入姿态评分 (占总分 30%):
+  *    1. 基础分 = 从机姿态评分 score (0..100)
+  *    2. 压力门控: pressure < 阈值 → 判定离座, 直接 0 分 (无人则无姿态可言)
+  *    3. 状态字符串修正 (从机发小写英文):
+  *         "absent"/"away"/"none"      → 0    (离开)
+  *         "distract"...               → ×0.6 (分心)
+  *         "fatigue"/"tired"/"drowsy"  → ×0.5 (疲劳)
+  *         "focused"/"good"/"normal"   → 原分 (×1.0)
+  *         其它/未知                   → 原分 (×1.0)
   */
 static uint8_t score_posture(const SlaveData_t *d)
 {
-    return u8_clamp((int)d->score);
+    /* 1. 基础分: 从机上报的姿态评分 */
+    int base = (int)d->score;
+    if (base < 0)   base = 0;
+    if (base > 100) base = 100;
+
+    /* 2. 压力门控: 离座直接 0 分 */
+    if (d->pressure < FUSION_PRESSURE_PRESENT_TH)
+    {
+        return 0;
+    }
+
+    /* 3. 状态字符串修正 */
+    float k = 1.0f;
+    const char *s = d->state;
+    if (s[0] != '\0')
+    {
+        if (strstr(s, "absent") || strstr(s, "away") || strstr(s, "none"))
+        {
+            return 0;
+        }
+        else if (strstr(s, "distract"))
+        {
+            k = 0.6f;
+        }
+        else if (strstr(s, "fatigue") || strstr(s, "tired") || strstr(s, "drowsy"))
+        {
+            k = 0.5f;
+        }
+        /* focused / good / normal 等 → k = 1.0, 用原分 */
+    }
+
+    return u8_clamp((int)((float)base * k + 0.5f));
 }
 
 /**
@@ -219,8 +265,18 @@ static void build_advice(FusionResult_t *r)
     }
     else if (who[0] == 'p')
     {
-        snprintf(r->advice, sizeof(r->advice),
-                 "Sit up straight, posture score is low.");
+        if (r->pressure < FUSION_PRESSURE_PRESENT_TH ||
+            strstr(r->posture_state, "absent") ||
+            strstr(r->posture_state, "away"))
+        {
+            snprintf(r->advice, sizeof(r->advice),
+                     "No one detected - have a seat to continue.");
+        }
+        else
+        {
+            snprintf(r->advice, sizeof(r->advice),
+                     "Sit up straight, posture score is low.");
+        }
     }
     else if (who[0] == 'e')
     {
@@ -405,7 +461,7 @@ void Fusion_Task(void *pvParameters)
         r.seq       = ++seq;
 
         xQueueOverwrite(s_queue, &r);
-        debug_print(&r);
+        //debug_print(&r);
 
         /* ----- 7. Sleep ---------------------------------------------- */
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(FUSION_PERIOD_MS));

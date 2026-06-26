@@ -21,6 +21,11 @@
 #include <stdio.h>
 #include <string.h>
 
+/* =========================== 调试开关 =========================== */
+/* 置 1: 每收到一帧 USART2 (ESP32) 数据, 都把原始内容通过 USART1 (printf) 打印出来,
+ *       用于排查"收不到 / 解析不到数据"的问题。排查完置 0 关闭即可。 */
+#define ESP32_RX_DEBUG   1
+
 /* =========================== 内部状态 =========================== */
 
 UART_HandleTypeDef huart2;
@@ -166,31 +171,47 @@ void USART2_IRQ_Handler(void)
         {
             /* 空 IDLE, 忽略 */
         }
-        else if (s_frame_ready)
-        {
-            /* 上一帧没消费, 丢弃当前帧, 但 DMA 仍重启避免溢出 */
-            s_stat_drop++;
-            HAL_UART_DMAStop(&huart2);
-            HAL_UART_Receive_DMA(&huart2, s_dma_buf, USART2_RX_BUFFER_SIZE);
-        }
         else
         {
+            /* DMA 写入后必须失效 DCache, 否则 CPU 读到旧数据 (全 0) */
             SCB_InvalidateDCache_by_Addr((uint32_t *)s_dma_buf, USART2_RX_BUFFER_SIZE);
 
             if (recv_len > USART2_RX_BUFFER_SIZE) recv_len = USART2_RX_BUFFER_SIZE;
-            memcpy(s_frame_buf, s_dma_buf, recv_len);
-            s_frame_buf[recv_len] = '\0';
-            s_frame_len   = recv_len;
-            s_frame_ready = 1;
-            s_stat_recv++;
+
+#if ESP32_RX_DEBUG
+            /* 调试: 无论上层是否来得及消费, 每个 IDLE 帧都通过 USART1 打印原始内容。
+             * 直接读 s_dma_buf (而非 s_frame_buf), 这样即使帧被丢弃也能看到。
+             * 逐字节输出: 可打印字符原样, 其余用 '.' 代替防止终端乱码。 */
+            printf("[ESP32-RX %u]: ", (unsigned)recv_len);
+            for (uint16_t i = 0; i < recv_len; i++)
+            {
+                uint8_t c = s_dma_buf[i];
+                putchar((c >= 0x20 && c < 0x7F) ? (char)c : '.');
+            }
+            printf("\r\n");
+#endif
+
+            if (s_frame_ready)
+            {
+                /* 上一帧还没被消费, 丢弃当前帧 (但仍重启 DMA 避免溢出) */
+                s_stat_drop++;
+            }
+            else
+            {
+                memcpy(s_frame_buf, s_dma_buf, recv_len);
+                s_frame_buf[recv_len] = '\0';
+                s_frame_len   = recv_len;
+                s_frame_ready = 1;
+                s_stat_recv++;
+
+                if (s_rx_task != NULL)
+                {
+                    vTaskNotifyGiveFromISR(s_rx_task, &xHigherPriorityTaskWoken);
+                }
+            }
 
             HAL_UART_DMAStop(&huart2);
             HAL_UART_Receive_DMA(&huart2, s_dma_buf, USART2_RX_BUFFER_SIZE);
-
-            if (s_rx_task != NULL)
-            {
-                vTaskNotifyGiveFromISR(s_rx_task, &xHigherPriorityTaskWoken);
-            }
         }
     }
 
@@ -233,4 +254,23 @@ void UART_ESP32_GetStats(uint32_t *recv, uint32_t *drop)
 {
     if (recv) *recv = s_stat_recv;
     if (drop) *drop = s_stat_drop;
+}
+
+/* =========================== 发送 API =========================== */
+
+int UART_ESP32_SendBytes(const uint8_t *data, uint16_t len)
+{
+    if (data == NULL || len == 0) return -1;
+
+    /* 阻塞发送: TX 走独立的 gState 状态机, 不影响 RX DMA 循环接收 */
+    if (HAL_UART_Transmit(&huart2, (uint8_t *)data, len, 100) != HAL_OK)
+    {
+        return -2;
+    }
+    return 0;
+}
+
+int UART_ESP32_SendByte(uint8_t cmd)
+{
+    return UART_ESP32_SendBytes(&cmd, 1);
 }

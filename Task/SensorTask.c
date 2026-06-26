@@ -190,7 +190,7 @@ void Sensor_Task(void *pvParameters)
 				{
 					uint16_t dc = MAX9814_ADC_ReadAvg(0);
 					sensor_data.soundIntensity = MAX9814_GetSoundPercent(0);
-					printf("[Sound] dc=%u, pct=%u%%\r\n", dc, sensor_data.soundIntensity);
+					//printf("[Sound] dc=%u, pct=%u%%\r\n", dc, sensor_data.soundIntensity);
 				}
 
         /* 填充时间戳并发送综合数据 */

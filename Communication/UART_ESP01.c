@@ -63,6 +63,7 @@ static void USART3_MspInit(void)
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
     /* PB11 = USART3_RX */
+
     GPIO_InitStruct.Pin       = GPIO_PIN_11;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -80,7 +81,7 @@ static void USART3_MspInit(void)
     hdma_usart3_rx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;
     if (HAL_DMA_Init(&hdma_usart3_rx) != HAL_OK)
     {
-        printf("[UART3] DMA init FAILED!\r\n");
+        printf("[ESP01-DBG] DMA init FAILED!\r\n");   /* 走 USART1 */
         return;
     }
 
@@ -112,7 +113,7 @@ void USART3_Init(void)
 
     if (HAL_UART_Init(&huart3) != HAL_OK)
     {
-        printf("[UART3] HAL init FAILED!\r\n");
+        printf("[ESP01-DBG] HAL init FAILED!\r\n");   /* 走 USART1 */
         return;
     }
 
@@ -125,16 +126,17 @@ void USART3_Init(void)
 
     if (HAL_UART_Receive_DMA(&huart3, s_dma_buf, USART3_RX_BUFFER_SIZE) != HAL_OK)
     {
-        printf("[UART3] HAL_UART_Receive_DMA FAILED!\r\n");
+        printf("[ESP01-DBG] HAL_UART_Receive_DMA FAILED!\r\n");   /* 走 USART1 */
         return;
     }
 
     __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
 
-    printf("[UART3] Init OK (PD8=TX, PB11=RX, %d bps)\r\n", USART3_BAUDRATE);
-    printf("[UART3] DMA buffer @ 0x%08X (size %u)\r\n",
+    printf("[ESP01-DBG] Init OK (PD8=TX, PB11=RX, %d bps)\r\n", USART3_BAUDRATE);
+    printf("[ESP01-DBG] DMA buffer @ 0x%08X (size %u)\r\n",
            (unsigned int)(uintptr_t)s_dma_buf,
            (unsigned int)USART3_RX_BUFFER_SIZE);
+    /* ↑ 这两条 log 都走 USART1, 不走 UART3. UART3 TX 只用于 learning_report_upload 发的 JSON */
 }
 
 /* =========================== 中断 =========================== */
@@ -228,4 +230,29 @@ void UART_ESP01_GetStats(uint32_t *recv, uint32_t *drop)
 {
     if (recv) *recv = s_stat_recv;
     if (drop) *drop = s_stat_drop;
+}
+
+/* ============================ 发送 API ============================ */
+
+/**
+  * @brief  通过 USART3 发送一段原始字节 (阻塞, 100ms 超时)
+  * @note   本驱动只配了 RX DMA, 发送用 HAL_UART_Transmit (单次短包, 1Hz 以下频率, 无并发)
+  */
+int UART_ESP01_Send(const uint8_t *data, uint16_t len)
+{
+    if (data == NULL || len == 0) return -1;
+
+    /* 100ms 超时: 115200 bps 1KB 也才 < 90ms, 100ms 足够 */
+    HAL_StatusTypeDef rc = HAL_UART_Transmit(&huart3, data, len, 100);
+    if (rc != HAL_OK) {
+        printf("[ESP01-DBG] TX fail (HAL=%d, len=%u)\r\n", (int)rc, (unsigned)len);
+        return -1;
+    }
+    return 0;
+}
+
+int UART_ESP01_SendString(const char *s)
+{
+    if (s == NULL) return -1;
+    return UART_ESP01_Send((const uint8_t *)s, (uint16_t)strlen(s));
 }

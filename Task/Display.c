@@ -37,6 +37,7 @@
 #include "FusionTask.h"       /* FusionResult_t, Fusion_GetLatest (调试面板推送) */
 #include "LearningScreen.h"   /* 学习界面 (独立模块) */
 #include "LearningReport.h"   /* 学习报告屏 (侘寂暖灰调, 替换旧 g_summary_screen) */
+#include "UART_ESP01.h"       /* UART3 -> ESP-01: 学习报告数据上传 (MQTT) */
 #include "lcd.h"              /* LCD_direction */
 #include "FreeRTOS.h"
 #include "task.h"
@@ -49,23 +50,17 @@
 #include <stdio.h>
 #include <string.h>
 
-/* ======================== 颜色定义 (Wabi-sabi warm gray palette) ======================== */
-#define BG_TOP           lv_color_hex(0xE8E1D5)   /* warm cream (gradient top) */
-#define BG_BOTTOM        lv_color_hex(0xCFC8B8)   /* deep warm gray (gradient bottom) */
-#define BG_COLOR         BG_TOP                  /* legacy alias for solid bg fallbacks */
-#define CARD_BG          lv_color_hex(0xFFFFFF)  /* pure white card */
-#define SHADOW_COLOR     lv_color_hex(0x6E6759)  /* warm gray shadow (cards) */
-#define TITLE_BG         lv_color_hex(0xE5DDCB)  /* warm cream title bar (was purple) */
-#define TITLE_FG         lv_color_hex(0x1A1815)  /* near-black title text (was white) */
-#define TEMP_COLOR       lv_color_hex(0xC54033)  /* temperature (deep muted red) */
-#define HUMI_COLOR       lv_color_hex(0x3D6B92)  /* humidity (deep muted blue) */
-#define SOUND_COLOR      lv_color_hex(0x7A5F3A)  /* sound indicator (sandalwood) */
-#define TEXT_COLOR       lv_color_hex(0x1A1815)  /* primary text (near-black) */
-#define DIM_COLOR        lv_color_hex(0x3A3631)  /* dim text (dark warm gray) */
-#define ACCENT_GOLD      lv_color_hex(0x7A5F3A)  /* warm gold accent (state label) */
-#define BTN_BG           lv_color_hex(0xFFFFFF)  /* button bg (white card-style) */
-#define BTN_BG_END       lv_color_hex(0xB05A4A)  /* end button bg (muted clay red) */
-#define BTN_BG_DISABLE   lv_color_hex(0xE5DDCB)  /* disabled button bg (warm cream) */
+/* ======================== 颜色定义 ======================== */
+#define BG_COLOR        lv_color_hex(0xE6EBEF)
+#define CARD_BG         lv_color_hex(0xFFFFFF)
+#define BORDER_COLOR    lv_color_hex(0x6667FF)
+#define TITLE_BG        lv_color_hex(0x6667FF)
+#define TITLE_FG        lv_color_hex(0xFFFFFF)
+#define TEMP_COLOR      lv_color_hex(0xE53935)
+#define HUMI_COLOR      lv_color_hex(0x1E88E5)
+#define SOUND_COLOR     lv_color_hex(0x8E24AA)  /* 音量指示器颜色 */
+#define TEXT_COLOR      lv_color_hex(0x222222)
+#define DIM_COLOR       lv_color_hex(0x607D8B)
 
 /* ======================== 字体定义 ======================== */
 #define FONT_TITLE      &lv_font_SourceHanSerifSC_Regular_17  /* 中文标题 室内/室外 */
@@ -165,17 +160,12 @@ static lv_obj_t *make_card(lv_obj_t *parent, int x, int y, int w, int h)
     lv_obj_t *card = lv_obj_create(parent);
     lv_obj_set_pos(card, x, y);
     lv_obj_set_size(card, w, h);
-    /* Wabi-sabi: white card with soft warm shadow, no border, large radius */
-    lv_obj_set_style_radius(card, 20, 0);
-    lv_obj_set_style_border_width(card, 0, 0);
+    lv_obj_set_style_radius(card, 6, 0);
+    lv_obj_set_style_border_width(card, 2, 0);
+    lv_obj_set_style_border_color(card, BORDER_COLOR, 0);
     lv_obj_set_style_bg_color(card, CARD_BG, 0);
     lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(card, 0, 0);
-    lv_obj_set_style_shadow_color(card, SHADOW_COLOR, 0);
-    lv_obj_set_style_shadow_width(card, 14, 0);
-    lv_obj_set_style_shadow_opa(card, LV_OPA_40, 0);
-    lv_obj_set_style_shadow_ofs_y(card, 3, 0);
-    lv_obj_set_style_shadow_spread(card, 0, 0);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
     return card;
 }
@@ -194,15 +184,12 @@ static lv_obj_t *make_label(lv_obj_t *parent, const char *txt,
 
 static lv_obj_t *make_card_title(lv_obj_t *card, const char *txt, int w)
 {
-    /* Wabi-sabi: warm cream title bar with dark text, no purple */
     lv_obj_t *t = make_label(card, txt, FONT_TITLE, TITLE_FG, 0, 0);
     lv_obj_set_size(t, w, 24);
     lv_obj_set_style_bg_color(t, TITLE_BG, 0);
     lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
     lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_pad_top(t, 2, 0);
-    /* Round only the top corners so it integrates with the card */
-    lv_obj_set_style_radius(t, 0, 0);
     return t;
 }
 
@@ -219,11 +206,7 @@ static void Weather_UI_Build(void)
 {
     /* 创建主屏幕 */
     g_weather_screen = lv_obj_create(NULL);
-    /* Wabi-sabi: warm cream gradient bg (top -> bottom) */
-    lv_obj_set_style_bg_color(g_weather_screen, BG_TOP, 0);
-    lv_obj_set_style_bg_grad_color(g_weather_screen, BG_BOTTOM, 0);
-    lv_obj_set_style_bg_grad_dir(g_weather_screen, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_bg_grad_stop(g_weather_screen, 255, 0);
+    lv_obj_set_style_bg_color(g_weather_screen, BG_COLOR, 0);
     lv_obj_set_style_bg_opa(g_weather_screen, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(g_weather_screen, 0, 0);
     lv_obj_clear_flag(g_weather_screen, LV_OBJ_FLAG_SCROLLABLE);
@@ -240,9 +223,8 @@ static void Weather_UI_Build(void)
                             FONT_TIME, TEXT_COLOR, 70, 5);
 
     /* 状态文字: 学习中 / 暂停中 / 已离开 (在 IDLE 状态为空) */
-    /* Wabi-sabi: dark gold accent instead of purple */
     label_state = make_label(g_weather_screen, "",
-                             FONT_EN12, ACCENT_GOLD, 140, 10);
+                             FONT_EN12, lv_color_hex(0x6667FF), 140, 10);
 
     /* === 状态机控制条 (由 ControlBar_Build 进一步创建按钮) === */
     ControlBar_Build();
@@ -490,42 +472,36 @@ static void ControlBar_Build(void)
     lv_obj_t *parent = g_weather_screen;
     if (parent == NULL) return;
 
-    /* 主操作按钮 (Start / Pause / Resume) */
-    /* Wabi-sabi: 白底 + 暖灰阴影 + 大圆角 + 深字, 无紫色 */
+    /* 主操作按钮 */
     btn_state1 = lv_btn_create(parent);
     lv_obj_set_size(btn_state1, 64, 24);
     lv_obj_set_pos(btn_state1, 180, 3);
-    lv_obj_set_style_bg_color(btn_state1, BTN_BG, 0);
+    lv_obj_set_style_bg_color(btn_state1, lv_color_hex(0x6667FF), 0);
     lv_obj_set_style_bg_opa(btn_state1, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(btn_state1, 12, 0);
-    lv_obj_set_style_border_width(btn_state1, 0, 0);
-    lv_obj_set_style_shadow_color(btn_state1, SHADOW_COLOR, 0);
-    lv_obj_set_style_shadow_width(btn_state1, 6, 0);
-    lv_obj_set_style_shadow_opa(btn_state1, LV_OPA_30, 0);
-    lv_obj_set_style_shadow_ofs_y(btn_state1, 1, 0);
+    lv_obj_set_style_radius(btn_state1, 4, 0);
+    lv_obj_set_style_border_width(btn_state1, 1, 0);
+    lv_obj_set_style_border_color(btn_state1, lv_color_hex(0x4040CC), 0);
+    lv_obj_set_style_shadow_width(btn_state1, 0, 0);
     lv_obj_set_style_pad_all(btn_state1, 0, 0);
     {
         lv_obj_t *lbl = lv_label_create(btn_state1);
         lv_label_set_text(lbl, "Start");
-        lv_obj_set_style_text_color(lbl, TEXT_COLOR, 0);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_style_text_font(lbl, FONT_EN12, 0);
         lv_obj_center(lbl);
     }
     lv_obj_add_event_cb(btn_state1, state_btn1_event_cb, LV_EVENT_CLICKED, NULL);
 
-    /* 结束按钮 (End) */
-    /* Wabi-sabi: 沉静的陶土红, 白字, 大圆角, 微阴影 */
+    /* 结束按钮 */
     btn_state2 = lv_btn_create(parent);
     lv_obj_set_size(btn_state2, 68, 24);
     lv_obj_set_pos(btn_state2, 248, 3);
-    lv_obj_set_style_bg_color(btn_state2, BTN_BG_END, 0);
+    lv_obj_set_style_bg_color(btn_state2, lv_color_hex(0xE53935), 0);
     lv_obj_set_style_bg_opa(btn_state2, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(btn_state2, 12, 0);
-    lv_obj_set_style_border_width(btn_state2, 0, 0);
-    lv_obj_set_style_shadow_color(btn_state2, SHADOW_COLOR, 0);
-    lv_obj_set_style_shadow_width(btn_state2, 6, 0);
-    lv_obj_set_style_shadow_opa(btn_state2, LV_OPA_30, 0);
-    lv_obj_set_style_shadow_ofs_y(btn_state2, 1, 0);
+    lv_obj_set_style_radius(btn_state2, 4, 0);
+    lv_obj_set_style_border_width(btn_state2, 1, 0);
+    lv_obj_set_style_border_color(btn_state2, lv_color_hex(0xB71C1C), 0);
+    lv_obj_set_style_shadow_width(btn_state2, 0, 0);
     lv_obj_set_style_pad_all(btn_state2, 0, 0);
     {
         lv_obj_t *lbl = lv_label_create(btn_state2);
@@ -536,24 +512,21 @@ static void ControlBar_Build(void)
     }
     lv_obj_add_event_cb(btn_state2, state_btn2_event_cb, LV_EVENT_CLICKED, NULL);
 
-    /* 摄像头按钮 (Camera, IDLE 状态显示) */
-    /* Wabi-sabi: 与 state1 同样的白底样式 */
+    /* 摄像头按钮 (IDLE 状态显示, 与结束按钮互斥) */
     btn_cam = lv_btn_create(parent);
     lv_obj_set_size(btn_cam, 68, 24);
     lv_obj_set_pos(btn_cam, 248, 3);
-    lv_obj_set_style_bg_color(btn_cam, BTN_BG, 0);
+    lv_obj_set_style_bg_color(btn_cam, lv_color_hex(0x00897B), 0);
     lv_obj_set_style_bg_opa(btn_cam, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(btn_cam, 12, 0);
-    lv_obj_set_style_border_width(btn_cam, 0, 0);
-    lv_obj_set_style_shadow_color(btn_cam, SHADOW_COLOR, 0);
-    lv_obj_set_style_shadow_width(btn_cam, 6, 0);
-    lv_obj_set_style_shadow_opa(btn_cam, LV_OPA_30, 0);
-    lv_obj_set_style_shadow_ofs_y(btn_cam, 1, 0);
+    lv_obj_set_style_radius(btn_cam, 4, 0);
+    lv_obj_set_style_border_width(btn_cam, 1, 0);
+    lv_obj_set_style_border_color(btn_cam, lv_color_hex(0x00695C), 0);
+    lv_obj_set_style_shadow_width(btn_cam, 0, 0);
     lv_obj_set_style_pad_all(btn_cam, 0, 0);
     {
         lv_obj_t *lbl = lv_label_create(btn_cam);
         lv_label_set_text(lbl, "Camera");
-        lv_obj_set_style_text_color(lbl, TEXT_COLOR, 0);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_style_text_font(lbl, FONT_EN12, 0);
         lv_obj_center(lbl);
     }
@@ -1029,6 +1002,50 @@ static void Picker_Tick(void)
 }
 
 /* ======================== 主任务函数 ======================== */
+
+/**
+  * @brief  进入 SUMMARY 状态时调用: 把学习报告数据打包成 JSON, 通过 UART3 发给 ESP-01
+  *         (ESP-01 上的固件负责把 JSON 转发到 MQTT 服务器)
+  *
+  * @note   1) 发送频率 ≤ 1次/会话, 完全可接受阻塞发送 (115200, < 30ms)
+  *         2) 发送失败不做重试, 不影响 UI 切屏
+  *         3) JSON 字段与 LRSessionData_t 一一对应
+  *         4) 末尾追加 '\n' 作为帧结束 (匹配 ESP-01 固件期望)
+  *         5) auto_ended 含义: 0=手动 End, 1=5min 离开超时, 2=目标时长达成
+  */
+static void learning_report_upload(const LRSessionData_t *d)
+{
+    if (d == NULL) return;
+
+    char json[256];
+    int n = snprintf(json, sizeof(json),
+        "{\"total_sec\":%u,\"target_sec\":%u,"
+        "\"avg_score\":%u,\"focus_pct\":%u,\"distract_pct\":%u,\"fatigue_pct\":%u,"
+        "\"posture_bad\":%u,\"away\":%u,\"pause\":%u,\"auto_ended\":%u}\n",
+        (unsigned)d->total_seconds,
+        (unsigned)d->target_seconds,
+        (unsigned)d->avg_total_score,
+        (unsigned)d->focus_pct,
+        (unsigned)d->distract_pct,
+        (unsigned)d->fatigue_pct,
+        (unsigned)d->posture_abnormal_count,
+        (unsigned)d->away_count,
+        (unsigned)d->pause_count,
+        (unsigned)d->auto_ended);
+
+    if (n <= 0 || n >= (int)sizeof(json)) {
+        printf("[ESP01-DBG] JSON format overflow (n=%d)\r\n", n);   /* 走 USART1 */
+        return;
+    }
+
+    int rc = UART_ESP01_SendString(json);
+    if (rc == 0) {
+        printf("[ESP01-DBG] Report uploaded %d bytes to ESP-01\r\n", n);   /* 走 USART1 */
+    } else {
+        printf("[ESP01-DBG] Report upload FAILED (HAL err)\r\n");          /* 走 USART1 */
+    }
+}
+
 void DisplayTask(void *pvParameters)
 {
     SensorData_t  sd;
@@ -1136,6 +1153,15 @@ void DisplayTask(void *pvParameters)
                 LearningReport_Update(&d);
                 LearningReport_RefreshAnim();
                 Picker_Hide();
+
+                /* 上传报告数据到 ESP-01 (再由 ESP-01 转发 MQTT)
+                 * 阻塞发送, ≤30ms, 不影响 UI 切屏;
+                 * 放在 Picker_Hide 和 lv_scr_load 之间, 失败不重试不报错
+                 *
+                 * 通道契约: USART3 (PD8/TX, PB11/RX) 只用于发学习报告 JSON,
+                 *          所有 printf 调试一律走 USART1, 不要混用. */
+                learning_report_upload(&d);
+
                 if (LearningReport_GetScreen()) {
                     LCD_direction(3);
                     lv_scr_load(LearningReport_GetScreen());

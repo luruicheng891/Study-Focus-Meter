@@ -22,7 +22,7 @@ Dialog DLL:      TCM.DLL V1.56.6.0
  
 <h2>Project:</h2>
 E:\Desktop\AIѧϰ״̬����Ƿ���\MDK-ARM\STM32H723.uvprojx
-Project File Date:  06/24/2026
+Project File Date:  06/25/2026
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.05 update 1 (build 106)', folder: 'D:\Keil5\ARM\ARMCC\Bin'
@@ -32,13 +32,11 @@ compiling main.c...
 compiling stm32h7xx_it.c...
 compiling stm32h7xx_hal_msp.c...
 compiling freertos.c...
-..\Task\AITask.h(38): warning:  #1-D: last line of file ends without a newline
-  #endif /* __AITASK_H */
 ..\Task\SlaveRxTask.h(91): warning:  #1-D: last line of file ends without a newline
   #endif /* __SLAVE_RX_TASK_H */
 ..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
   #endif /* __FUSION_TASK_H */
-..\Core\Src\freertos.c: 3 warnings, 0 errors
+..\Core\Src\freertos.c: 2 warnings, 0 errors
 compiling led.c...
 compiling usart.c...
 compiling sccb.c...
@@ -86,9 +84,6 @@ compiling heap_4.c...
 compiling cmsis_os2.c...
 compiling TIM.c...
 compiling Camera.c...
-..\Task\AITask.h(38): warning:  #1-D: last line of file ends without a newline
-  #endif /* __AITASK_H */
-..\Task\Camera.c: 1 warning, 0 errors
 compiling WeatherTask.c...
 compiling SensorTask.c...
 ..\Sensor\BH1750.h(81): warning:  #1-D: last line of file ends without a newline
@@ -96,11 +91,6 @@ compiling SensorTask.c...
 ..\Task\SensorTask.c: 1 warning, 0 errors
 compiling display_mode.c...
 compiling AITask.c...
-..\Task\AITask.h(38): warning:  #1-D: last line of file ends without a newline
-  #endif /* __AITASK_H */
-..\Task\AITask.c(211): warning:  #1-D: last line of file ends without a newline
-  }
-..\Task\AITask.c: 2 warnings, 0 errors
 compiling SlaveRxTask.c...
 ..\Task\SlaveRxTask.h(91): warning:  #1-D: last line of file ends without a newline
   #endif /* __SLAVE_RX_TASK_H */
@@ -124,24 +114,46 @@ compiling SlaveRxTask.c...
 compiling Display.c...
 ..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
   #endif /* __FUSION_TASK_H */
-..\Task\Display.c(1031): warning:  #223-D: function "ScreenSaver_Tick" declared implicitly
+..\Task\Display.c(1099): warning:  #223-D: function "ScreenSaver_Tick" declared implicitly
           ScreenSaver_Tick();
-..\Task\Display.c(1143): warning:  #1-D: last line of file ends without a newline
+..\Task\Display.c(1233): warning:  #1-D: last line of file ends without a newline
   }
-..\Task\Display.c(382): warning:  #177-D: function "weather_switch_btn_event_cb" was declared but never referenced
+..\Task\Display.c(109): warning:  #177-D: variable "label_hero_time" was declared but never referenced
+  static lv_obj_t *label_hero_time  = NULL;     /* "00:23" or "1:23:45" */
+..\Task\Display.c(110): warning:  #177-D: variable "label_hero_state" was declared but never referenced
+  static lv_obj_t *label_hero_state = NULL;     /* "Studying" / "Paused" / "Away" 小字副标 */
+..\Task\Display.c(113): warning:  #177-D: variable "state_dot" was declared but never referenced
+  static lv_obj_t *state_dot        = NULL;     /* 圆形 lv_obj, �?anim 模拟呼吸 */
+..\Task\Display.c(114): warning:  #177-D: variable "state_dot_anim" was declared but never referenced
+  static lv_anim_t state_dot_anim;              /* 呼吸动画句柄 */
+..\Task\Display.c(117): warning:  #177-D: variable "btn_pill" was declared but never referenced
+  static lv_obj_t *btn_pill         = NULL;     /* 胶囊容器 */
+..\Task\Display.c(118): warning:  #177-D: variable "lbl_pill_main" was declared but never referenced
+  static lv_obj_t *lbl_pill_main    = NULL;     /* �? Pause/Resume/Start/Camera */
+..\Task\Display.c(119): warning:  #177-D: variable "lbl_pill_dots" was declared but never referenced
+  static lv_obj_t *lbl_pill_dots    = NULL;     /* �? ··· 进度�?*/
+..\Task\Display.c(120): warning:  #177-D: variable "lbl_pill_end" was declared but never referenced
+  static lv_obj_t *lbl_pill_end     = NULL;     /* �? End (弱化) */
+..\Task\Display.c(123): warning:  #177-D: variable "label_in_panel" was declared but never referenced
+  static lv_obj_t *label_in_panel   = NULL;     /* "Indoor" 小字 */
+..\Task\Display.c(124): warning:  #177-D: variable "label_out_panel" was declared but never referenced
+  static lv_obj_t *label_out_panel  = NULL;     /* "Outdoor" 小字 */
+..\Task\Display.c(127): warning:  #177-D: variable "g_session_start_tick" was declared but never referenced
+  static uint32_t g_session_start_tick = 0;     /* HAL_GetTick() at ST_LEARNING entry */
+..\Task\Display.c(128): warning:  #177-D: variable "g_session_timer_running" was declared but never referenced
+  static uint8_t  g_session_timer_running = 0;  /* 1 = counting, 0 = idle */
+..\Task\Display.c(426): warning:  #177-D: function "weather_switch_btn_event_cb" was declared but never referenced
   static void weather_switch_btn_event_cb(lv_event_t *e)
-..\Task\Display.c: 4 warnings, 0 errors
+..\Task\Display.c: 16 warnings, 0 errors
 compiling TouchTask.c...
 compiling FusionTask.c...
 ..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
   #endif /* __FUSION_TASK_H */
-..\Task\AITask.h(38): warning:  #1-D: last line of file ends without a newline
-  #endif /* __AITASK_H */
 ..\Task\SlaveRxTask.h(91): warning:  #1-D: last line of file ends without a newline
   #endif /* __SLAVE_RX_TASK_H */
 ..\Task\FusionTask.c(427): warning:  #1-D: last line of file ends without a newline
   }
-..\Task\FusionTask.c: 4 warnings, 0 errors
+..\Task\FusionTask.c: 3 warnings, 0 errors
 compiling StateTask.c...
 ..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
   #endif /* __FUSION_TASK_H */
@@ -152,6 +164,7 @@ compiling LearningScreen.c...
 ..\Task\FusionTask.h(113): warning:  #1-D: last line of file ends without a newline
   #endif /* __FUSION_TASK_H */
 ..\Task\LearningScreen.c: 1 warning, 0 errors
+compiling LearningReport.c...
 compiling Reminder.c...
 compiling ScreenSaver.c...
 compiling UART_ESP01.c...
@@ -461,8 +474,8 @@ compiling lv_font_SourceHanSerifSC_Regular_30.c...
 assembling startup_stm32h723xx.s...
 compiling system_stm32h7xx.c...
 linking...
-Program Size: Code=246510 RO-data=333006 RW-data=8332 ZI-data=125516  
-".\STM32H723\STM32H723.axf" - 0 Error(s), 57 Warning(s).
+Program Size: Code=250298 RO-data=366050 RW-data=8520 ZI-data=125512  
+".\STM32H723\STM32H723.axf" - 0 Error(s), 64 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -489,10 +502,10 @@ Package Vendor: Keil
       Source file:   CMSIS/UserCodeTemplates/ARM/ITM_Retarget.c
 
    * Component: Keil::Device:Startup@1.11.0
-      Source file:   Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/system_stm32h7xx.c
-      Include file:  Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
       Source file:   Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/arm/startup_stm32h723xx.s
-Build Time Elapsed:  00:00:49
+      Include file:  Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
+      Source file:   Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/system_stm32h7xx.c
+Build Time Elapsed:  00:01:05
 </pre>
 </body>
 </html>

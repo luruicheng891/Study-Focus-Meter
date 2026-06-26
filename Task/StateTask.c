@@ -15,9 +15,7 @@
 #include "StateTask.h"
 
 #include "FusionTask.h"
-#include "SlaveRxTask.h"
-#include "UART_ESP32.h"        /* huart2 */
-#include "stm32h7xx_hal.h"
+#include "SlaveRxTask.h"      /* Slave_GetLatest / Slave_SendCmd / SLAVE_CMD_* */
 
 #include "FreeRTOS.h"
 #include "queue.h"
@@ -28,7 +26,6 @@
 /* ======================== 内部常量 ======================== */
 
 #define STATE_EVT_QUEUE_LEN        16
-#define BLE_CMD_BUF_LEN            64
 
 /* ======================== 静态变量 ======================== */
 
@@ -82,7 +79,7 @@ static void     monitor_pressure(void);
 static void     check_away_timeout(void);
 static void     check_time_complete(void);
 static void     update_session_stats(void);
-static void     ble_send_cmd(const char *cmd);
+static void     slave_send_cmd(uint8_t cmd);
 
 /* ======================== 工具函数 ======================== */
 
@@ -210,23 +207,17 @@ uint32_t State_GetSustainedPosture(void)
     return sustained_ms(s_posture_bad_start_tick);
 }
 
-/* ======================== BLE 命令发送 ======================== */
+/* ======================== 从机控制指令发送 ======================== */
 
 /**
-  * @brief  通过 USART2 向 ESP32 发送 JSON 指令
-  * @note   简单阻塞发送, 指令很短 (< 64 字节), 100ms 超时足够
-  *         主循环每 200ms 才进一次, 不会影响其他任务
+  * @brief  通过 USART2 向 ESP32 (从机) 发送单字符控制指令
+  * @param  cmd  SLAVE_CMD_START('A') / SLAVE_CMD_STOP('Z') / SLAVE_CMD_SLEEP('S')
+  * @note   实际发送在 SlaveRxTask 业务层封装 (Slave_SendCmd), 本任务只决定时机。
+  *         主循环每 200ms 才进一次, 阻塞发送单字节不影响其他任务。
   */
-static void ble_send_cmd(const char *cmd)
+static void slave_send_cmd(uint8_t cmd)
 {
-    if (cmd == NULL) return;
-
-    char buf[BLE_CMD_BUF_LEN];
-    int n = snprintf(buf, sizeof(buf), "{\"cmd\":\"%s\"}\n", cmd);
-    if (n <= 0 || n >= (int)sizeof(buf)) return;
-
-    HAL_UART_Transmit(&huart2, (uint8_t *)buf, (uint16_t)n, 100);
-    printf("[State] BLE -> %s", buf);
+    Slave_SendCmd(cmd);
 }
 
 /* ======================== 会话统计 ======================== */
@@ -276,8 +267,8 @@ static void state_enter_picking(uint16_t minutes)
     s_picking        = 1;
     s_cur_state      = ST_PICKING;
 
-    /* 通知子机开始采集 (跟 LEARNING 一样, 因为椅子可能很快有人) */
-    ble_send_cmd("start");
+    /* 注意: 不在此处发送 'A'。按需求, 'A' (开始接收) 在用户确认时长
+     * 进入 LEARNING 时才发送 (见 state_enter_learning)。 */
     printf("[State] -> PICKING (target=%u min)\r\n", s_target_minutes);
 }
 
@@ -296,15 +287,10 @@ static void state_enter_learning(void)
     s_picking                = 0;
     s_summary.target_seconds = (uint16_t)(s_target_minutes * 60);
 
-    /* 进入学习: 通知子机开始采集 (PICKING 已发, 这里再发一次也无害) */
-    if (s_session_start_tick != 0)
-    {
-        /* 首次进入 LEARNING, 不重复发 BLE start (PICKING 已发) */
-    }
-    else
-    {
-        ble_send_cmd("start");
-    }
+    /* 通知子机开始接收/上报数据 (发送 'A')
+     * 触发场景: 确认时长 (PICKING→LEARNING)、暂停后继续 (PAUSED→LEARNING)、
+     *           离开后回座 (AWAY→LEARNING)。AWAY 期间未停流, 重发 'A' 也无害。 */
+    slave_send_cmd(SLAVE_CMD_START);
     printf("[State] -> LEARNING (target=%u min)\r\n", s_target_minutes);
 }
 
@@ -338,7 +324,9 @@ static void state_enter_paused(void)
 
     s_cur_state = ST_PAUSED;
     s_summary.pause_count++;
-    ble_send_cmd("pause");
+    /* 暂停 = 停止接收数据 (发送 'Z'); 继续时 state_enter_learning 会重发 'A'。
+     * 如希望暂停时从机仍上报数据, 删除此行即可。 */
+    slave_send_cmd(SLAVE_CMD_STOP);
     printf("[State] -> PAUSED (count=%lu)\r\n",
            (unsigned long)s_summary.pause_count);
 }
@@ -348,8 +336,8 @@ static void state_enter_summary(uint8_t auto_ended)
     s_cur_state    = ST_SUMMARY;
     s_summary.auto_ended = auto_ended;
 
-    /* 通知子机停止采集 */
-    ble_send_cmd("stop");
+    /* 学习结束: 通知子机停止接收/上报数据 (发送 'Z') */
+    slave_send_cmd(SLAVE_CMD_STOP);
 
     /* 计算总时长 */
     TickType_t now = xTaskGetTickCount();
@@ -399,46 +387,52 @@ static void handle_event(const StateEvent_t *e)
 {
     switch (s_cur_state)
     {
-    /* ============== IDLE: 响应开始 → PICKING ============== */
+    /* ============== IDLE: 响应开始 → PICKING (不在此判断是否有人) ============== */
     case ST_IDLE:
         if (e->kind == STATE_EVT_GUI_START)
         {
-            /* 二次校验: 椅子上有人 (有 BLE 数据时) */
-            SlaveData_t sd;
-            int has_data = (Slave_GetLatest(&sd) == 0);
-            float p = has_data ? sd.pressure : 0.0f;
-
-            if (!has_data)
-            {
-                /* 调试模式: 无 BLE 数据, 直接放行 */
-                printf("[State] GUI_START (no BLE data, dev mode)\r\n");
-                state_enter_picking(STATE_DEFAULT_DURATION_MIN);
-            }
-            else if (p > STATE_PRESSURE_THRESHOLD)
-            {
-                state_enter_picking(STATE_DEFAULT_DURATION_MIN);
-            }
-            else
-            {
-                /* 椅子上没人: 拒绝 + 屏幕提示 */
-                char msg[64];
-                snprintf(msg, sizeof(msg),
-                         "Please sit on chair (p=%.1f)",
-                         (double)p);
-                State_SetMessage(msg);
-                printf("[State] GUI_START refused: %s\r\n", msg);
-            }
+            /* 点击 Start 直接进入时长选择界面 (PICKING)。
+             * "椅子上是否有人" 的判断移到用户确认时长 (PICKING→LEARNING) 时再做,
+             * 避免在主界面就被拦下、连时长都选不了。 */
+            printf("[State] GUI_START -> PICKING\r\n");
+            state_enter_picking(STATE_DEFAULT_DURATION_MIN);
         }
         break;
 
-    /* ============== PICKING: 等用户选时长 / 自动超时 ============== */
+    /* ============== PICKING: 选时长 → 确认时判断是否有人 ============== */
     case ST_PICKING:
         switch (e->kind)
         {
         case STATE_EVT_GUI_CONFIRM_DURATION:
-            /* 用户 (或 5s 超时) 确认了时长, 进入 LEARNING */
-            state_enter_learning();
+        {
+            /* 应用用户选择的时长 (param = 分钟数, 0 表示沿用默认) */
+            if (e->param > 0)
+            {
+                s_target_minutes = (e->param > 255) ? 255 : (uint8_t)e->param;
+            }
+
+            /* 确认时长后, 再判断椅子上是否有人 */
+            SlaveData_t sd;
+            int   has_data = (Slave_GetLatest(&sd) == 0);
+            float p        = has_data ? sd.pressure : 0.0f;
+
+            if (!has_data || p > STATE_PRESSURE_THRESHOLD)
+            {
+                /* 有人, 或 无从机数据(调试模式) → 进入学习 */
+                state_enter_learning();
+            }
+            else
+            {
+                /* 椅子上没人: 提示并退回主界面, 用户坐下后可重新点 Start */
+                char msg[64];
+                snprintf(msg, sizeof(msg),
+                         "Please sit on chair (p=%.1f)", (double)p);
+                State_SetMessage(msg);
+                printf("[State] CONFIRM refused: %s\r\n", msg);
+                state_enter_idle();
+            }
             break;
+        }
         case STATE_EVT_GUI_END:
             /* 取消选时长, 回到 IDLE */
             state_enter_idle();

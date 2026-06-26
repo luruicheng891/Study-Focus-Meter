@@ -14,7 +14,10 @@
   *            - GUI (Display) : 通过 State_PostEvent() 投递用户操作
   *
   *          输出控制:
-  *            - BLE (USART2)  : 状态切换时发送 {"cmd":"start|stop|pause"} 给子机
+  *            - BLE (USART2)  : 状态切换时向从机发送单字符指令
+  *                              'A'=开始接收 (确认时长进入 LEARNING),
+  *                              'Z'=停止接收 (暂停 / 学习结束),
+  *                              'S'=休眠 (预留, 经 Slave_Sleep() 触发)
   *            - SessionSummary : 结束时填好统计, GUI 可读取
   *
   *          状态转移图 (主流程):

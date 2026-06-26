@@ -27,6 +27,7 @@
                                  State_GetSustainedDistract/Fatigue/Posture */
 #include "WeatherTask.h"      /* WeatherInfo_t, Weather_GetLatest */
 #include "FusionTask.h"       /* FusionResult_t, 调试面板用 (posture/score) */
+#include "SlaveRxTask.h"      /* SlaveData_t, Slave_GetLatest — 调试面板原始分数/压力 */
 #include "AITask.h"           /* AI_GetLatestProbs — 调试面板必须用实时, 不走 Fusion */
 #include "FreeRTOS.h"
 #include "task.h"
@@ -132,6 +133,8 @@ static lv_obj_t *lr_dbg_lbl_t     = NULL;   /* T:  5% */
 static lv_obj_t *lr_dbg_lbl_s     = NULL;   /* S: 85 */
 static lv_obj_t *lr_dbg_lbl_v     = NULL;   /* V: 80 */
 static lv_obj_t *lr_dbg_lbl_p     = NULL;   /* P: normal */
+static lv_obj_t *lr_dbg_lbl_po    = NULL;   /* Po: 77  (从机原始姿态分数) */
+static lv_obj_t *lr_dbg_lbl_pr    = NULL;   /* Pr: 0.0 (从机原始压力值) */
 static lv_obj_t *lr_dbg_lbl_seq   = NULL;   /* #123 */
 
 /* 内部状态 */
@@ -376,7 +379,7 @@ static void lr_end_btn_event_cb(lv_event_t *e)
 
 /* ======================== 调试面板 ========================
  *
- *  位置: 屏幕左侧, x=4, y=20, w=80, h=160
+ *  位置: 屏幕左侧, x=4, y=14, w=80, h=178
  *  默认隐藏; 点击顶部 "DBG" 按钮展开
  *
  *  内容 (14pt 分类结果 + 12pt 细节):
@@ -390,11 +393,14 @@ static void lr_end_btn_event_cb(lv_event_t *e)
  *    ────────
  *    S:  85           ← 综合分
  *    V:  80           ← 视觉子分
- *    P: normal        ← 坐姿状态
+ *    P: normal        ← 坐姿状态 (融合)
+ *    Po:  77          ← 从机刚收到的原始姿态分数
+ *    Pr: 0.0          ← 从机刚收到的原始压力值
  *    #1234            ← 帧序号
  *
  *  颜色用降饱和色, 仍与主界面气质一致.
- *  w=80 不与中央外环 (x=86) 重叠, h=160 不与底部环境卡 (y=184) 重叠.
+ *  w=80 不与中央外环 (x=86) 重叠; 作为调试浮层, 底部略压住环境卡 (y=184),
+ *  仅在开发者点击 DBG 时出现, 可接受.
  */
 static lv_obj_t *lr_dbg_make_line(lv_obj_t *parent, const char *txt,
                                   int x, int y, lv_color_t color,
@@ -414,8 +420,8 @@ static void lr_dbg_build(void)
 {
     /* 面板底 (圆角暗卡) */
     lr_dbg_panel = lv_obj_create(lr_screen);
-    lv_obj_set_size(lr_dbg_panel, 80, 160);
-    lv_obj_set_pos(lr_dbg_panel, 4, 20);
+    lv_obj_set_size(lr_dbg_panel, 80, 178);
+    lv_obj_set_pos(lr_dbg_panel, 4, 14);
     lv_obj_set_style_bg_color(lr_dbg_panel, LR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(lr_dbg_panel, LV_OPA_80, 0);
     lv_obj_set_style_radius(lr_dbg_panel, 6, 0);
@@ -425,19 +431,21 @@ static void lr_dbg_build(void)
     lv_obj_set_style_pad_all(lr_dbg_panel, 0, 0);
     lv_obj_clear_flag(lr_dbg_panel, LV_OBJ_FLAG_SCROLLABLE);
 
-    /* 行布局 (12pt 行高 14px):
+    /* 行布局 (12pt 行高 ~13px, 14pt class 占 ~18px):
      *   y=2   标题 (12pt)
-     *   y=18  class (14pt, 占 18px, 结束 y=36)
-     *   y=40  divider 1
-     *   y=50  F
-     *   y=64  D
-     *   y=78  T
-     *   y=92  divider 2
-     *   y=104 S
-     *   y=118 V
-     *   y=132 P
-     *   y=146 #seq
-     *  末行结束 y=160, 面板高 160 刚好容纳.
+     *   y=15  class (14pt, 结束 y=33)
+     *   y=35  divider 1
+     *   y=45  F
+     *   y=58  D
+     *   y=71  T
+     *   y=84  divider 2
+     *   y=94  S  (融合总分)
+     *   y=107 V  (视觉子分)
+     *   y=120 P  (坐姿状态字符串)
+     *   y=133 Po (从机原始姿态分数)
+     *   y=146 Pr (从机原始压力值)
+     *   y=159 #seq
+     *  末行结束 y=171, 面板高 178 刚好容纳.
      */
 
     /* 标题 */
@@ -445,33 +453,41 @@ static void lr_dbg_build(void)
                      LR_GREEN_SOFT, FONT_SMALL, &lr_dbg_lbl_ai);
 
     /* 主分类结果 (14pt, 跟随后续染色) */
-    lr_dbg_make_line(lr_dbg_panel, ">> ---", 6, 18,
+    lr_dbg_make_line(lr_dbg_panel, ">> ---", 6, 15,
                      LR_FG_DIM, FONT_MID, &lr_dbg_lbl_class);
 
     /* 分隔线 1 */
-    lr_dbg_make_line(lr_dbg_panel, "-------", 6, 40,
+    lr_dbg_make_line(lr_dbg_panel, "-------", 6, 35,
                      LR_FG_DIM, FONT_SMALL, NULL);
 
     /* F / D / T 概率 */
-    lr_dbg_make_line(lr_dbg_panel, "F: --", 6, 50,
+    lr_dbg_make_line(lr_dbg_panel, "F: --", 6, 45,
                      LR_GREEN_SOFT, FONT_SMALL, &lr_dbg_lbl_f);
-    lr_dbg_make_line(lr_dbg_panel, "D: --", 6, 64,
+    lr_dbg_make_line(lr_dbg_panel, "D: --", 6, 58,
                      LR_YELLOW_SOFT, FONT_SMALL, &lr_dbg_lbl_d);
-    lr_dbg_make_line(lr_dbg_panel, "T: --", 6, 78,
+    lr_dbg_make_line(lr_dbg_panel, "T: --", 6, 71,
                      LR_ORANGE_SOFT, FONT_SMALL, &lr_dbg_lbl_t);
 
     /* 分隔线 2 */
-    lr_dbg_make_line(lr_dbg_panel, "-------", 6, 92,
+    lr_dbg_make_line(lr_dbg_panel, "-------", 6, 84,
                      LR_FG_DIM, FONT_SMALL, NULL);
 
-    /* S 总分 / V 视觉分 / P 坐姿 / #帧号 */
-    lr_dbg_make_line(lr_dbg_panel, "S: --", 6, 104,
+    /* S 总分 / V 视觉分 / P 坐姿状态 */
+    lr_dbg_make_line(lr_dbg_panel, "S: --", 6, 94,
                      LR_FG_SOFT, FONT_SMALL, &lr_dbg_lbl_s);
-    lr_dbg_make_line(lr_dbg_panel, "V: --", 6, 118,
+    lr_dbg_make_line(lr_dbg_panel, "V: --", 6, 107,
                      LR_FG_MID, FONT_SMALL, &lr_dbg_lbl_v);
-    lr_dbg_make_line(lr_dbg_panel, "P: --", 6, 132,
+    lr_dbg_make_line(lr_dbg_panel, "P: --", 6, 120,
                      LR_FG_MID, FONT_SMALL, &lr_dbg_lbl_p);
-    lr_dbg_make_line(lr_dbg_panel, "#0",   6, 146,
+
+    /* 从机 (ESP32) 刚接收到的原始分数 / 压力值 */
+    lr_dbg_make_line(lr_dbg_panel, "Po: --", 6, 133,
+                     LR_PROG_TEAL, FONT_SMALL, &lr_dbg_lbl_po);
+    lr_dbg_make_line(lr_dbg_panel, "Pr: --", 6, 146,
+                     LR_PROG_CYAN, FONT_SMALL, &lr_dbg_lbl_pr);
+
+    /* #帧号 */
+    lr_dbg_make_line(lr_dbg_panel, "#0",   6, 159,
                      LR_FG_DIM, FONT_SMALL, &lr_dbg_lbl_seq);
 
     /* 默认隐藏 */
@@ -925,6 +941,23 @@ void LearningScreen_UpdateFusion(const FusionResult_t *f)
         p_buf[sizeof(p_buf) - 1] = '\0';
         snprintf(buf, sizeof(buf), "P:%.8s", p_buf);
         if (lr_dbg_lbl_p) lv_label_set_text(lr_dbg_lbl_p, buf);
+    }
+
+    /* ===== Po / Pr: 从机 (ESP32) 刚接收到的原始姿态分数 + 压力值 =====
+     * 直接走 Slave_GetLatest 取最新一帧, 不经融合, 反映"刚收到"的值。
+     * 无数据时显示 "--" 占位。 */
+    {
+        SlaveData_t sd;
+        if (Slave_GetLatest(&sd) == 0) {
+            snprintf(buf, sizeof(buf), "Po:%3ld", (long)sd.score);
+            if (lr_dbg_lbl_po) lv_label_set_text(lr_dbg_lbl_po, buf);
+
+            snprintf(buf, sizeof(buf), "Pr:%.1f", (double)sd.pressure);
+            if (lr_dbg_lbl_pr) lv_label_set_text(lr_dbg_lbl_pr, buf);
+        } else {
+            if (lr_dbg_lbl_po) lv_label_set_text(lr_dbg_lbl_po, "Po: --");
+            if (lr_dbg_lbl_pr) lv_label_set_text(lr_dbg_lbl_pr, "Pr: --");
+        }
     }
 
     /* ===== 帧号: 用 AI_Result_t.seq (真实推理序号, 每完成一次推理 +1) =====

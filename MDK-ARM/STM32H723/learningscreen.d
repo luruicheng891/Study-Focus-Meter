@@ -145,6 +145,7 @@
 .\stm32h723\learningscreen.o: ..\Task\FusionTask.h
 .\stm32h723\learningscreen.o: ..\Task\StateTask.h
 .\stm32h723\learningscreen.o: ..\Task\WeatherTask.h
+.\stm32h723\learningscreen.o: ..\Task\AITask.h
 .\stm32h723\learningscreen.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdio.h
 .\stm32h723\learningscreen.o: D:\Keil5\ARM\ARMCC\Bin\..\include\stdlib.h
 .\stm32h723\learningscreen.o: D:\Keil5\ARM\ARMCC\Bin\..\include\math.h

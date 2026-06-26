@@ -140,6 +140,7 @@
 .\stm32h723\camera.o: ..\LVGL\src/extra/widgets/imgbtn/lv_imgbtn.h
 .\stm32h723\camera.o: ..\LVGL\src/extra/widgets/span/lv_span.h
 .\stm32h723\camera.o: ..\Task\AITask.h
+.\stm32h723\camera.o: ..\Freertos\include\queue.h
 .\stm32h723\camera.o: ..\Task\display_mode.h
 .\stm32h723\camera.o: ..\LCD\lcd.h
 .\stm32h723\camera.o: ../Core/Inc/main.h

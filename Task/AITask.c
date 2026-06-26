@@ -211,12 +211,12 @@ void AI_InferTask(void *argument)
             AI_BroadcastResult(&result);
 
             /* 串口打印 (调试用) */
-            printf("[AI] #%lu %s (F:%.1f%% D:%.1f%% T:%.1f%%)\r\n",
+           /* printf("[AI] #%lu %s (F:%.1f%% D:%.1f%% T:%.1f%%)\r\n",
                    (unsigned long)result.seq, str,
                    (double)(probs[0] * 100.0f),
                    (double)(probs[1] * 100.0f),
                    (double)(probs[2] * 100.0f));
-
+            */
             /* 更新 LVGL 标签 (仅 Camera 模式可见) */
             lv_label_set_text_fmt(label_ai_result, "AI: %s", str);
             lv_label_set_text_fmt(label_ai_probs,

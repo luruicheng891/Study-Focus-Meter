@@ -38,6 +38,12 @@ extern "C" {
 
 #define SLAVE_STATE_STR_LEN     16
 
+/* ===================== 主机 → 从机 控制指令 (单字符协议) ===================== */
+/* 主机通过 USART2 (PA2=TX) 向 ESP32 发送单字符指令控制其数据上报行为 */
+#define SLAVE_CMD_START         'A'   /* 开始采集/上报数据                 */
+#define SLAVE_CMD_STOP          'Z'   /* 停止采集/上报数据                 */
+#define SLAVE_CMD_SLEEP         'S'   /* 进入休眠 (预留, 触发时机后续决定) */
+
 /**
   * @brief  单帧从机数据 (新 JSON 协议)
   */
@@ -83,6 +89,35 @@ int Slave_WaitNew(SlaveData_t *out, TickType_t timeout);
   * @param  parse_err JSON 解析失败次数，可为 NULL
   */
 void Slave_GetStats(uint32_t *recv, uint32_t *drop, uint32_t *parse_err);
+
+/* ============================ 控制指令 API ============================ */
+
+/**
+  * @brief  向从机 (ESP32) 发送单字符控制指令
+  * @param  cmd  指令字符 (SLAVE_CMD_START / SLAVE_CMD_STOP / SLAVE_CMD_SLEEP)
+  * @retval 0  发送成功
+  * @retval <0 发送失败 (底层驱动错误)
+  * @note   线程安全: 内部走 UART_ESP32 阻塞发送, TX 与 RX 互不干扰。
+  */
+int Slave_SendCmd(uint8_t cmd);
+
+/**
+  * @brief  通知从机开始采集/上报数据 (发送 'A')
+  * @retval 同 Slave_SendCmd
+  */
+int Slave_StartReceive(void);
+
+/**
+  * @brief  通知从机停止采集/上报数据 (发送 'Z')
+  * @retval 同 Slave_SendCmd
+  */
+int Slave_StopReceive(void);
+
+/**
+  * @brief  通知从机进入休眠 (发送 'S', 预留接口, 触发时机由上层决定)
+  * @retval 同 Slave_SendCmd
+  */
+int Slave_Sleep(void);
 
 #ifdef __cplusplus
 }

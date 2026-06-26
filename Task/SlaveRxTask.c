@@ -213,3 +213,30 @@ void Slave_GetStats(uint32_t *recv, uint32_t *drop, uint32_t *parse_err)
     UART_ESP32_GetStats(recv, drop);
     if (parse_err) *parse_err = s_stat_parse_err;
 }
+
+/* =========================== 控制指令 API =========================== */
+
+int Slave_SendCmd(uint8_t cmd)
+{
+    int ret = UART_ESP32_SendByte(cmd);
+    printf("[从机] 发送指令 '%c' (0x%02X) -> %s\r\n",
+           (cmd >= 0x20 && cmd < 0x7F) ? (char)cmd : '?',
+           (unsigned int)cmd,
+           (ret == 0) ? "OK" : "FAIL");
+    return ret;
+}
+
+int Slave_StartReceive(void)
+{
+    return Slave_SendCmd(SLAVE_CMD_START);
+}
+
+int Slave_StopReceive(void)
+{
+    return Slave_SendCmd(SLAVE_CMD_STOP);
+}
+
+int Slave_Sleep(void)
+{
+    return Slave_SendCmd(SLAVE_CMD_SLEEP);
+}

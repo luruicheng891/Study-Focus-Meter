@@ -33,7 +33,7 @@ extern "C" {
 
 /* ============================ 配置参数 ============================ */
 
-#define USART2_BAUDRATE         115200
+#define USART2_BAUDRATE         9600
 #define USART2_RX_BUFFER_SIZE   256
 
 /* DMA RX 缓冲区物理地址 (AXI SRAM)
@@ -84,6 +84,28 @@ int UART_ESP32_TakeFrame(uint8_t *buf, uint16_t max_len, uint16_t *out_len);
   * @param  drop  上层来不及消费导致丢弃的帧数, 可传 NULL
   */
 void UART_ESP32_GetStats(uint32_t *recv, uint32_t *drop);
+
+/* ============================ 发送 API ============================ */
+
+/**
+  * @brief  通过 USART2 (PA2=TX) 向 ESP32 发送原始字节 (阻塞)
+  * @param  data  数据指针
+  * @param  len   字节数
+  * @retval 0   发送成功
+  * @retval -1  参数错误
+  * @retval -2  HAL 发送失败 / 超时
+  * @note   TX 与 RX DMA 互不干扰: HAL UART 用独立的 gState (TX) 与
+  *         RxState (RX) 状态机, 阻塞发送不会打断循环接收 DMA。
+  *         指令通常很短 (< 64 字节), 内部用 100ms 超时。
+  */
+int UART_ESP32_SendBytes(const uint8_t *data, uint16_t len);
+
+/**
+  * @brief  向 ESP32 发送单字节指令 (供业务层封装协议使用)
+  * @param  cmd  单字节指令 (如 'A'/'Z'/'S')
+  * @retval 同 UART_ESP32_SendBytes
+  */
+int UART_ESP32_SendByte(uint8_t cmd);
 
 #ifdef __cplusplus
 }
