@@ -1,11 +1,11 @@
 /**
   ******************************************************************************
   * @file    display_mode.c
-  * @brief   屏幕显示模式运行时切换 + USART1 命令接收 + printf 非阻塞 TX
+  * @brief   屏幕显示模式运行时切换 + printf 非阻塞 TX
   *
-  *          USART1 (PA9 TX / PA10 RX, 115200) 命令字符:
-  *            'C' / 'c' → 切换到摄像头模式 (LCD 方向 1, 横屏)
-  *            'W' / 'w' → 切换到天气仪表板 (LCD 方向 3, 横屏 180° 翻转)
+  *          模式切换仅通过 DisplayMode_Request() (任务上下文, 例如按钮回调) 完成.
+  *          USART1 RX 命令通道已禁用, 不再响应 'C'/'W' 字符,
+  *          避免 RX 引脚悬空时的电气噪声误触发屏幕来回跳转.
   *
   *          为防止多任务并发 printf 导致 HAL_UART_Transmit 阻塞死锁,
   *          这里接管了 fputc, 改用环形缓冲 + TXE 中断的非阻塞实现:
@@ -24,11 +24,19 @@
 #include <stdarg.h>
 #include <string.h>
 
+/* ============================ 编译开关 ============================ */
+/* 数据采集构建: 置 1 重新使能 USART1 RX, 收到 'P'/'p' 抓拍一帧.
+ * 正式量产构建可置 0, 恢复"关闭 RX 防悬空噪声"的行为. */
+#define CAM_CAPTURE_RX_ENABLE   1
+
 /* ============================ 状态变量 ============================ */
 volatile DisplayMode_t g_display_mode = DISP_MODE_CAMERA;
 
 static volatile DisplayMode_t s_pending_mode = DISP_MODE_CAMERA;
 static volatile uint8_t       s_pending_flag = 0;
+
+/* 抓拍请求标志 (ISR 置位, Camera_task 轮询清除) */
+static volatile uint8_t       s_capture_flag = 0;
 
 /* ============================ TX 环形缓冲 ============================ */
 #define TX_RING_SIZE   2048   /* 2KB, 应付突发的 print_weather_info 等大块输出 */
@@ -104,52 +112,96 @@ int DisplayMode_TakePending(DisplayMode_t *out_mode)
     return has;
 }
 
-static void process_rx_byte(uint8_t b)
+/* ============================ 抓拍 API ============================ */
+
+void DisplayMode_RequestCapture(void)
 {
-    char ch = (char)b;
-    switch(ch) {
-        case 'C': case 'c':
-            DisplayMode_Request(DISP_MODE_CAMERA);
-            break;
-        case 'W': case 'w':
-            DisplayMode_Request(DISP_MODE_WEATHER);
-            break;
-        default:
-            break;
+    s_capture_flag = 1;
+}
+
+int DisplayMode_TakeCaptureRequest(void)
+{
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    int has = s_capture_flag;
+    s_capture_flag = 0;
+    if(!primask) __enable_irq();
+    return has;
+}
+
+/**
+ * @brief USART1 原始字节阻塞发送 — 独占 TDR, 把整帧图像 dump 到上位机
+ * @note  1) 临时关闭 TXE 中断, 防止 printf 环形缓冲与帧数据交织;
+ *        2) 逐字节轮询 TXE, 忙等时 taskYIELD 让出 CPU 给同/高优先级任务;
+ *        3) 发完等 TC, 再视情况恢复 TXE 让残留 printf 继续.
+ *        FIFO 模式已在 USART1_Init 中关闭, 这里按单字节 TXE 处理.
+ */
+void USART1_SendRaw_Blocking(const uint8_t *data, uint32_t len)
+{
+    if(data == NULL || len == 0) return;
+
+    /* 冻结环形缓冲 TX 中断, 独占 TDR */
+    USART1->CR1 &= ~USART_CR1_TXEIE_TXFNFIE;
+
+    for(uint32_t i = 0; i < len; i++)
+    {
+        uint32_t guard = 0;
+        /* 等待 TDR 空 (H7 FIFO 位名 TXE_TXFNF) */
+        while(!(USART1->ISR & USART_ISR_TXE_TXFNF))
+        {
+            if((++guard & 0x3FF) == 0) {
+                taskYIELD();   /* 忙等期间让出 CPU, 避免饿死同优先级任务 */
+            }
+        }
+        USART1->TDR = data[i];
+    }
+
+    /* 等待最后一字节移位完成 */
+    while(!(USART1->ISR & USART_ISR_TC)) { }
+
+    /* 环形缓冲里若还有未发的 printf 数据, 重新使能 TXE 让 ISR 接管 */
+    if(tx_head != tx_tail) {
+        USART1->CR1 |= USART_CR1_TXEIE_TXFNFIE;
     }
 }
 
+static void process_rx_byte(uint8_t b)
+{
+    /* USART1 RX 命令通道已禁用, 此函数保留为占位, 不再被调用. */
+    (void)b;
+}
+
 /* ============================ 启动 ============================ */
+/**
+ * @brief 使能 USART1 NVIC 中断, 供 TXE (printf 非阻塞发送) 使用.
+ *        RX 命令通道已移除, 此函数不碰 RX 相关寄存器.
+ *        在 main.c 中 USART1_Init() 之后调用.
+ */
 void DisplayMode_StartUart1Rx(void)
 {
-    /* 确保 USART1 接收使能并清错误标志 */
-    USART1->CR1 |= USART_CR1_RE;
-    USART1->ICR  = USART_ICR_ORECF | USART_ICR_FECF | USART_ICR_NECF |
-                   USART_ICR_PECF  | USART_ICR_IDLECF;
-
-    /* 使能 RXNE 中断 */
-    USART1->CR1 |= USART_CR1_RXNEIE_RXFNEIE;
-
-    /* 配置 NVIC (优先级 6, 在 FreeRTOS 安全范围内) */
     HAL_NVIC_SetPriority(USART1_IRQn, 6, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
 
-    printf("[CMD] USART1 ready. 'C'=camera, 'W'=weather.\r\n");
+#if CAM_CAPTURE_RX_ENABLE
+    /* 数据采集构建: 使能 RX, 收到 'P'/'p' 触发抓拍.
+     * 采集时上位机串口已接好, RX 被驱动, 不存在悬空噪声;
+     * 即便误收一字节, 最多多 dump 一帧, 无副作用. */
+    USART1->CR1 |= USART_CR1_RXNEIE_RXFNEIE;
+#endif
 }
 
 /* ============================ USART1 IRQ ============================ */
+/**
+ * @brief USART1 中断入口: 仅处理 TXE (printf 发送), 不再处理 RX
+ *        (DisplayMode_StartUart1Rx 中已关闭 RXNEIE 和 NVIC).
+ *        保留这个 handler 是为了让 NVIC 表有合法入口, 万一其他代码
+ *        误触发 USART1 中断也不会跑飞.
+ */
 void USART1_IRQ_Handler(void)
 {
     USART_TypeDef *u = USART1;
     uint32_t isr = u->ISR;
     uint32_t cr1 = u->CR1;
-
-    /* === RX === */
-    if((isr & USART_ISR_RXNE_RXFNE) && (cr1 & USART_CR1_RXNEIE_RXFNEIE))
-    {
-        uint8_t b = (uint8_t)(u->RDR & 0xFFU);
-        process_rx_byte(b);
-    }
 
     /* === TX (TXE_TXFNF) === */
     if((isr & USART_ISR_TXE_TXFNF) && (cr1 & USART_CR1_TXEIE_TXFNFIE))
@@ -163,6 +215,17 @@ void USART1_IRQ_Handler(void)
             u->CR1 &= ~USART_CR1_TXEIE_TXFNFIE;
         }
     }
+
+#if CAM_CAPTURE_RX_ENABLE
+    /* === RX (RXNE_RXFNE): 单字节命令, 'P'/'p' 请求抓拍一帧 === */
+    if((isr & USART_ISR_RXNE_RXFNE) && (cr1 & USART_CR1_RXNEIE_RXFNEIE))
+    {
+        uint8_t b = (uint8_t)(u->RDR & 0xFF);   /* 读 RDR 自动清 RXNE */
+        if(b == 'P' || b == 'p') {
+            s_capture_flag = 1;
+        }
+    }
+#endif
 
     /* === 错误清除 === */
     if(isr & (USART_ISR_ORE | USART_ISR_FE | USART_ISR_NE | USART_ISR_PE))

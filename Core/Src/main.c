@@ -20,6 +20,7 @@
 #include "lv_port_disp.h"
 #include "TIM.h"
 #include "display_mode.h"
+#include "rtc.h"
 
 
 /*cJSON内存适配FreeRTOS*/
@@ -59,12 +60,17 @@ int main(void)
 	
 	SystemClock_Config();
 	CJSON_Init();
+
+	/* 初始化 RTC (LSE 32.768kHz 外部晶振, 脱网走时; 联网后由 WeatherTask 对时) */
+	MX_RTC_Init();
 	
 	/* 初始化 USART1 (调试串口, printf 输出) */
 	USART1_Init();
 
-	/* 启动 USART1 单字节中断接收, 用于命令切换显示模式 ('C'/'W') */
+	/* 使能 USART1 NVIC, 供 TXE 中断 (printf 非阻塞发送) 使用 */
 	DisplayMode_StartUart1Rx();
+
+
 	
 	/* 初始化 LCD 硬件 */
 	LCD_Init();
@@ -98,8 +104,15 @@ void SystemClock_Config(void)
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  /* 提高 LSE 驱动能力: H7 默认 LOW, 晶振振荡微弱时 RTC 会漏计数导致走慢 (实测 ~8%)。
+   * LSEDRIVE 只能在 LSE 关闭时写入, 故先复位备份域 (会清掉 RTC 时间, 但联网会重新对时)。 */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_BACKUPRESET_FORCE();
+  __HAL_RCC_BACKUPRESET_RELEASE();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_HIGH);
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 10;
@@ -130,6 +143,16 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
+  /* RTC 时钟源 = LSE (外部 32.768kHz 晶振, 精度优于 LSI, 脱网可走时;
+   * 联网时由 WeatherTask 用网络 HH:MM 对时校准) */
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+  PeriphClkInitStruct.RTCClockSelection    = RCC_RTCCLKSOURCE_LSE;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 void MPU_Config(void)
@@ -156,7 +179,7 @@ void MPU_Config(void)
 
 void Error_Handler(void)
 {
-  __disable_irq();//全局禁用所有可屏蔽中断
+  __disable_irq();
   while (1)
   {
   }

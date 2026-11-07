@@ -1,39 +1,20 @@
-/***
-	*************************************************************************************************
-	*	@version V1.0
-	*	@author  Â¹Ð¡°à¿Æ¼¼	
-   *************************************************************************************************
-   *  @description
-	*
-	*	ÊµÑéÆ½Ì¨£ºÂ¹Ð¡°àSTM32H723ZGT6ºËÐÄ°å £¨ÐÍºÅ£ºLXB723ZG-P1£©
-	* ¿Í·þÎ¢ÐÅ£º19949278543
-	*
->>>>> ÎÄ¼þËµÃ÷£º
-	*
-	*	³õÊ¼»¯LEDµÄIO¿Ú£¬ÅäÖÃÎªÍÆÍìÊä³ö¡¢ËÙ¶ÈµÈ¼¶2M¡£
-	*
-	************************************************************************************************
-***/
-
-
 #include "led.h"  
 
-
+//åˆå§‹åŒ–LED,å¹¶ç‚¹äº®
 void LED_Init(void)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-	__HAL_RCC_LED1_CLK_ENABLE;		// ³õÊ¼»¯LED1 GPIOÊ±ÖÓ	
+	__HAL_RCC_LED1_CLK_ENABLE;		// åˆå§‹åŒ–LED1 GPIOæ—¶é’Ÿ	
 
 
-	HAL_GPIO_WritePin(LED1_PORT, LED1_PIN, GPIO_PIN_RESET);		// LED1Òý½ÅÊä³öµÍ£¬¼´µãÁÁLED1
-
-
-	GPIO_InitStruct.Pin 		= LED1_PIN;					// LED1Òý½Å
-	GPIO_InitStruct.Mode 	= GPIO_MODE_OUTPUT_PP;	// ÍÆÍìÊä³öÄ£Ê½
-	GPIO_InitStruct.Pull 	= GPIO_NOPULL;				// ²»ÉÏÏÂÀ­
-	GPIO_InitStruct.Speed 	= GPIO_SPEED_FREQ_LOW;	// µÍËÙÄ£Ê½
+	GPIO_InitStruct.Pin 		= LED1_PIN;					// LED1å¼•è„š
+	GPIO_InitStruct.Mode 	= GPIO_MODE_OUTPUT_PP;	// æŽ¨æŒ½è¾“å‡ºæ¨¡å¼
+	GPIO_InitStruct.Pull 	= GPIO_NOPULL;				// ä¸ä¸Šä¸‹æ‹‰
+	GPIO_InitStruct.Speed 	= GPIO_SPEED_FREQ_LOW;	// ä½Žé€Ÿæ¨¡å¼
 	HAL_GPIO_Init(LED1_PORT, &GPIO_InitStruct);
+
+	HAL_GPIO_WritePin(LED1_PORT, LED1_PIN, GPIO_PIN_RESET);		// LED1å¼•è„šè¾“å‡ºä½Žï¼Œå³ç‚¹äº®LED1
 
 
 }

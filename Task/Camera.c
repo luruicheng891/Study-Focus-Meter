@@ -10,6 +10,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "Camera.h"
+#include "AITask.h"
 #include "display_mode.h"
 #include "lcd.h"
 #include "dcmi_ov2640.h"
@@ -30,6 +31,41 @@
 /* LVGL canvas 全局对象 (供 Weather_Task 控制 hidden) */
 lv_obj_t *g_cam_canvas = NULL;
 
+/*============================================================================
+ *  LVGL 按钮: 切换到天气仪表板
+ *  放在摄像头画布右侧空白区, 不影响画面
+ *============================================================================*/
+static void cam_switch_btn_event_cb(lv_event_t *e)
+{
+    /* 仅在非天气模式时才请求切换, 避免重复触发 */
+    if(g_display_mode != DISP_MODE_WEATHER) {
+        DisplayMode_Request(DISP_MODE_WEATHER);
+    }
+}
+
+static void cam_create_switch_button(lv_obj_t *parent)
+{
+    /* 按钮放在屏幕右下角 (cam 画布 240x240 居中, 右边有 80px 空白, 下方 0) */
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_set_size(btn, 60, 30);
+    lv_obj_align(btn, LV_ALIGN_BOTTOM_RIGHT, -8, -8);
+    lv_obj_add_event_cb(btn, cam_switch_btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    /* 按钮样式: 紫色背景, 圆角 */
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x6667FF), 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(btn, 6, 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(0x4040CC), 0);
+    lv_obj_set_style_shadow_width(btn, 0, 0);
+
+    /* 按钮标签 */
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, "Sensor");
+    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_center(label);
+}
+
 /**
   * @brief  摄像头采集任务 (FreeRTOS)
   */
@@ -46,6 +82,9 @@ void Camera_task(void *argument)
                          Display_Width, Display_Height, LV_IMG_CF_TRUE_COLOR);
     lv_obj_center(g_cam_canvas);
 
+    /* 添加"切到天气"按钮 */
+    cam_create_switch_button(lv_scr_act());
+
     /* 启动 DMA 连续采集 */
     OV2640_DMA_Transmit_Continuous(Camera_Buffer, OV2640_BufferSize);
 
@@ -58,10 +97,25 @@ void Camera_task(void *argument)
             /* 失效 DCache, 让 CPU 读到 DMA 写入的最新帧 */
             SCB_InvalidateDCache_by_Addr((uint32_t *)Camera_Buffer, Frame_Bytes);
 
-            /* 仅在摄像头模式下拷贝并触发重绘, 减少不必要的 LVGL 工作量 */
+            /* ===== 始终复制到 Canvas_Buffer + 通知 AI =====
+             * 原因: AITask 现在在所有显示模式下都跑推理, 用来:
+             *   - 持续通过 mailbox queue (s_q_fusion / s_q_debug) 分发结果
+             *   - 给 FusionTask 和 LearningScreen 调试面板提供实时数据
+             *   必须在每帧都给 AI 一份稳定副本 (memcpy 完才是稳定副本).
+             * DCMI 连续模式下每帧都会进这里 (~30fps), 复制成本可接受.
+             */
+            memcpy((void *)Canvas_Buffer, (void *)Camera_Buffer, Frame_Bytes);
+
+            /* 通知 AI 推理任务: 有新帧可处理 (非阻塞) */
+            if (AI_TaskHandle != NULL) {
+                xTaskNotifyGive(AI_TaskHandle);
+            }
+
+            /* ===== 仅 CAMERA 模式才触发 LVGL canvas 重绘 =====
+             * Weather/Learning 模式下不需要刷新 canvas (屏幕上看不到).
+             * 这样省下 lv_obj_invalidate 的开销, 同时保持数据通道畅通. */
             if(g_display_mode == DISP_MODE_CAMERA)
             {
-                memcpy((void *)Canvas_Buffer, (void *)Camera_Buffer, Frame_Bytes);
                 lv_obj_invalidate(g_cam_canvas);
             }
         }
