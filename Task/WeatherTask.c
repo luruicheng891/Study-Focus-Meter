@@ -20,6 +20,7 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "cJSON.h"
+#include "rtc.h"            /* RTC_SyncFromNetwork — 收到网络时间即对时 */
 #include <stdio.h>
 #include <string.h>
 
@@ -145,10 +146,23 @@ void Weather_RxTask(void *pvParameters)
 
     printf("[Weather] RxTask started, waiting for JSON data...\r\n");
 
+    uint32_t heartbeat = 0;
     for (;;)
     {
-        /* 阻塞等待 ISR 唤醒 (帧结束) */
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        /* 带 2s 超时的等待, 超时后打印心跳用于调试 */
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(2000)) == 0)
+        {
+            uint32_t idle_irq = 0, dma_remain = 0;
+            UART_ESP01_GetDebugStats(&idle_irq, &dma_remain);
+            heartbeat++;
+            /* printf("[Weather] heartbeat #%lu  idle_irq=%lu  dma_remain=%lu/%d  frame_ready=%d\r\n",
+                   (unsigned long)heartbeat,
+                   (unsigned long)idle_irq,
+                   (unsigned long)dma_remain,
+                   USART3_RX_BUFFER_SIZE,
+                   (int)0);  s_frame_ready 是 static, 这里固定 0; 若 idle_irq>0 说明中断有触发 */
+            continue;
+        }
 
         /* 从底层取出原始字节 */
         if (UART_ESP01_TakeFrame((uint8_t *)local_buf,
@@ -166,6 +180,16 @@ void Weather_RxTask(void *pvParameters)
             info.timestamp = xTaskGetTickCount();
             xQueueOverwrite(s_queue, &info);
             print_weather_info(&info);
+
+            /* 收到网络时间 -> 对时 RTC (智能校准, 首次直设/偏差>30s 才校准) */
+            if (info.time[0] != '\0')
+            {
+                unsigned int hh = 0, mm = 0, ss = 0;
+                if (sscanf(info.time, "%u:%u:%u", &hh, &mm, &ss) == 3)
+                {
+                    RTC_SyncFromNetwork((uint8_t)hh, (uint8_t)mm, (uint8_t)ss);
+                }
+            }
         }
         else
         {

@@ -20,6 +20,7 @@ virtualFolder:
             - name: Core
               files:
                 - path: ../Core/Src/main.c
+                - path: ../Core/Src/rtc.c
                 - path: ../Core/Src/stm32h7xx_it.c
                 - path: ../Core/Src/stm32h7xx_hal_msp.c
                 - path: ../Core/Src/freertos.c
@@ -59,6 +60,8 @@ virtualFolder:
             - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim_ex.c
             - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart.c
             - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart_ex.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rtc.c
+            - path: ../Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rtc_ex.c
           folders: []
         - name: CMSIS
           files: []
@@ -98,10 +101,12 @@ virtualFolder:
         - path: ../Task/TouchTask.c
         - path: ../Task/FusionTask.c
         - path: ../Task/StateTask.c
+        - path: ../Task/PowerManager.c
         - path: ../Task/LearningScreen.c
         - path: ../Task/LearningReport.c
         - path: ../Task/Reminder.c
         - path: ../Task/ScreenSaver.c
+        - path: ../Task/WeatherScreen.c
       folders: []
     - name: Communication
       files:
@@ -338,28 +343,9 @@ virtualFolder:
       folders: []
     - name: LVGL_UI
       files:
-        - path: ../GUI/LVGL_myGui/src/custom/custom.c
-        - path: ../GUI/LVGL_myGui/src/generated/gui_guider.c
-        - path: ../GUI/LVGL_myGui/src/generated/events_init.c
-        - path: ../GUI/LVGL_myGui/src/generated/setup_scr_screen_1.c
-        - path: ../GUI/LVGL_myGui/src/generated/widgets_init.c
         - path: ../GUI/LVGL_myGui/src/generated/images/_WIFI_alpha_20x20.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_temperature_alpha_40x40.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_humidity_alpha_30x30.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_percentage_alpha_26x26.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_Celsius_alpha_25x25.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_Celsius_alpha_20x20.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_Sunny_Cloudy_alpha_88x67.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_low_alpha_30x50.c
-        - path: ../GUI/LVGL_myGui/src/generated/images/_high_alpha_30x50.c
-        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Antonio_Regular_25.c
-        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_25.c
-        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_30.c
-        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_50.c
-        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_Alatsi_Regular_75.c
         - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_SourceHanSerifSC_Regular_12.c
         - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_SourceHanSerifSC_Regular_17.c
-        - path: ../GUI/LVGL_myGui/src/generated/guider_fonts/lv_font_SourceHanSerifSC_Regular_30.c
       folders: []
     - name: ::CMSIS
       files: []

@@ -15,7 +15,7 @@
   *    Mode distribution bar (3 segments):
   *      - Focus / Distract / Fatigue
   *    End mode banner:
-  *      - Manual / Auto (5min away) / Time Complete
+  *      - Manual / Auto (3min away) / Time Complete
   *    Stats row (3 cells):
   *      - Posture abnormal count
   *      - Away count
@@ -50,11 +50,11 @@ typedef struct {
     uint8_t  avg_total_score;          /* average score (0..100) */
     uint8_t  focus_pct;                /* focus share (0..100) */
     uint8_t  distract_pct;             /* distract share (0..100) */
-    uint8_t  fatigue_pct;              /* fatigue share (0..100) */
+    uint8_t  phone_pct;                /* phone (playing phone) share (0..100) */
     uint8_t  posture_abnormal_count;   /* posture abnormal times */
     uint32_t away_count;               /* away times */
     uint32_t pause_count;              /* pause times */
-    uint8_t  auto_ended;               /* 0=manual, 1=5min away, 2=time complete */
+    uint8_t  auto_ended;               /* 0=manual, 1=3min away, 2=time complete */
 } LRSessionData_t;
 
 /**

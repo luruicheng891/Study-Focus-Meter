@@ -119,7 +119,7 @@ static void debug_print(const SlaveData_t *d)
     uint32_t recv = 0, drop = 0;
     UART_ESP32_GetStats(&recv, &drop);
 
-    printf("\r\n========== 从机帧 #%lu ==========\r\n",
+    printf("\r\n========== 从机帧 #%lu ==========\r\n", 
            (unsigned long)d->seq);
 
     if (ts_hi)

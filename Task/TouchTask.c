@@ -60,18 +60,16 @@ static lv_indev_t       *s_indev_touchpad = NULL;
 
 /**
   * @brief LVGL indev 读取回调
-  * @note  weather / camera 屏幕都用 LCD_direction(3) 做了 180° 翻转,
-  *        触摸硬件输出的物理坐标方向与 LVGL 控件方向相反, 此处反向补偿:
-  *          x' = W - 1 - x,  y' = H - 1 - y
+  * @note  所有屏幕现改用 LCD_direction(1) (与开机 USE_HORIZONTAL 默认方向、
+  *        触摸校准时的物理方向一致), 不再需要 180° 反向补偿。
+  *        (历史: 曾用 LCD_direction(3), 与校准方向相差 180°, 需要
+  *         x'=W-1-x, y'=H-1-y 补偿; 全屏改为 direction(1) 后已去掉)
   */
 static void lvgl_touchpad_read_cb(lv_indev_drv_t *indev, lv_indev_data_t *data)
 {
     (void)indev;
     lv_coord_t x = (lv_coord_t)s_indev_x;
     lv_coord_t y = (lv_coord_t)s_indev_y;
-
-    x = (lv_coord_t)lcddev.width  - 1 - x;
-    y = (lv_coord_t)lcddev.height - 1 - y;
 
     data->state   = s_indev_pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
     data->point.x = x;
@@ -250,11 +248,10 @@ void Touch_Task(void *pvParameters)
                    (unsigned long)press_cnt, x, y,
                    (unsigned long)scan_cnt);
 
-            /* LCD 做了 180° 翻转, 物理 (x,y) 与视觉 (x',y') 关系:
-             *   x' = W-1-x,  y' = H-1-y
-             * 视觉右上角 (x' 大, y' 小) 对应物理 (x 小, y 大), 即左下角。 */
-            if (x <  RECALIB_AREA_W &&
-                y >= (uint16_t)(lcddev.height - RECALIB_AREA_H)) {
+            /* 现物理坐标与视觉坐标一致 (不再做 180° 补偿, 见 read_cb 注释),
+             * 视觉右上角 = 物理右上角: x 大, y 小。 */
+            if (x >= (uint16_t)(lcddev.width - RECALIB_AREA_W) &&
+                y <  RECALIB_AREA_H) {
                 hold_active = 1;
                 hold_start  = xTaskGetTickCount();
                 printf("[TP] Hold top-right corner for re-calib...\r\n");

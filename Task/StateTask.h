@@ -24,7 +24,7 @@
   *
   *             [IDLE] --GUI_START--> [PICKING] --GUI_CONFIRM_DURATION(min)--> [LEARNING]
   *                ^                     |                                          |
-  *                | GUI_BACK            | GUI_END (cancel)                         | GUI_END / 5min timeout
+  *                | GUI_BACK            | GUI_END (cancel)                         | GUI_END / 3min timeout
   *             [SUMMARY] <--- GUI_BACK -+                                       [AWAY] <-- pressure lost 30s
   *                ^                                                                      |
   *                |                                                                      | pressure back
@@ -67,7 +67,7 @@ typedef enum {
     STATE_EVT_GUI_CONFIRM_DURATION, /* PICKING 状态: 用户确认时长 (param = 分钟数) */
     STATE_EVT_PRESSURE_LOST,        /* 内部: 压力传感器超时 */
     STATE_EVT_PRESSURE_BACK,        /* 内部: 压力恢复 */
-    STATE_EVT_AWAY_TIMEOUT,         /* 内部: AWAY 状态超时 (5min) */
+    STATE_EVT_AWAY_TIMEOUT,         /* 内部: AWAY 状态超时 (3 min) */
     STATE_EVT_TIME_COMPLETE,        /* 内部: 倒计时到 0 (时长达成) */
 } StateEventKind_t;
 
@@ -86,24 +86,33 @@ typedef struct {
     uint32_t total_seconds;            /* 本次学习总时长 (秒) */
     uint16_t target_seconds;           /* 目标学习时长 (秒, 0 表示无目标) */
     uint8_t  avg_total_score;          /* 平均总分 (0..100) */
-    uint8_t  focus_pct;                /* 专注占比 (0..100) */
-    uint8_t  distract_pct;             /* 分心占比 (0..100) */
-    uint8_t  fatigue_pct;              /* 疲劳占比 (0..100) */
+    uint8_t  focus_pct;                /* 专心占比 (0..100) */
+    uint8_t  distract_pct;             /* 走神占比 (0..100) */
+    uint8_t  phone_pct;                /* 玩手机占比 (0..100) */
     uint8_t  posture_abnormal_count;   /* 坐姿异常次数 */
     uint32_t away_count;               /* 离开次数 */
     uint32_t pause_count;              /* 暂停次数 */
-    uint8_t  auto_ended;               /* 0 = 手动结束, 1 = 5min AWAY, 2 = 时长达成 */
+    uint8_t  auto_ended;               /* 0 = 手动结束, 1 = 3min AWAY, 2 = 时长达成 */
 } SessionSummary_t;
 
 /* ======================== 阈值与周期 ======================== */
 
 #define STATE_PRESSURE_THRESHOLD     5.0f       /* 视为"有人"的最小压力值 */
-#define STATE_AWAY_DETECT_MS         (30 * 1000) /* 压力 = 0 持续 30s → AWAY */
-#define STATE_AWAY_TIMEOUT_MS        (5 * 60 * 1000) /* AWAY 持续 5min → 自动结束 */
+#define STATE_AWAY_DETECT_MS         (30 * 1000) /* 压力 = 0 持续 30s → AWAY (暂停 + 提示) */
+#define STATE_AWAY_TIMEOUT_MS        (3 * 60 * 1000) /* AWAY 持续 3 min → 自动结束 */
 #define STATE_MONITOR_PERIOD_MS      200         /* 主循环轮询周期 */
 #define STATE_POSTURE_BAD_SCORE      50          /* 坐姿评分低于此值视为异常 */
 #define STATE_DEFAULT_DURATION_MIN   30          /* 默认目标时长 (分钟) */
 #define STATE_VALID_DURATIONS        {5, 10, 15, 20, 25, 30, 45, 60, 90, 120}  /* 合法时长选项 */
+
+/* ======================== 连续不专注扣分 ========================
+ * 专注检测界面: 若连续 N 帧从机状态为"不专注", 累加扣分 (会话内累计,
+ * 退出 LEARNING 时清零), 用于实时显示与 SUMMARY 平均分.
+ * 仅在 LEARNING 状态启用; 离开座位 (absent) 不计入此计数, 避免 AWAY
+ * 期间每 3 秒扣一次分 (见 StateTask.c::monitor_focus). */
+#define STATE_NF_PENALTY_THRESHOLD   3           /* 连续 N 次不专注 → 扣分 */
+#define STATE_NF_PENALTY_AMOUNT      5           /* 每次扣分点数 (0..100) */
+#define STATE_NF_PENALTY_MAX         50          /* 单次会话累计扣分上限   */
 
 /* ======================== 任务入口 ======================== */
 
@@ -166,10 +175,26 @@ int State_IsPersonPresent(void);
 uint32_t State_GetElapsedSeconds(void);
 
 /**
+  * @brief  获取本次会话的目标时长 (秒)
+  * @retval 目标秒数; 0 表示无目标 (不倒计时)
+  * @note   由用户在 PICKING 界面选择、CONFIRM_DURATION 时应用。
+  *         供学习界面倒计时与进度环使用, 保证与 Picker 选择一致。
+  */
+uint32_t State_GetTargetSeconds(void);
+
+/**
   * @brief  设置一个屏幕提示消息 (例如 "请先坐下"), 3 秒后自动过期
   * @param  msg: 消息内容 (NULL 清空)
   */
 void State_SetMessage(const char *msg);
+
+/**
+  * @brief  设置带自定义超时的消息, timeout_ms=0 表示不过期 (需手动清空)
+  * @param  msg         消息内容 (NULL 清空)
+  * @param  timeout_ms  自动过期时间 (ms); 0 = 持久显示, 直到下次清空
+  * @note   主要用于 AWAY 状态的"人已离开"提示 (持续到返回 LEARNING)
+  */
+void State_SetMessageEx(const char *msg, uint32_t timeout_ms);
 
 /**
   * @brief  读取当前未过期的提示消息
@@ -179,6 +204,22 @@ void State_SetMessage(const char *msg);
 const char *State_GetMessage(uint32_t *age_ms);
 
 /**
+  * @brief  获取"连续不专注"在当前会话内累计的扣分 (0..N)
+  * @retval 累计扣分点数; 0 表示尚未触发任何扣分
+  * @note   由 UI 在显示总评分时减去此值, 也用于 SUMMARY avg_total_score.
+  *         退出 LEARNING (进入 IDLE/SUMMARY) 时由 reset_session_stats 清零.
+  */
+uint8_t State_GetScorePenalty(void);
+
+/**
+  * @brief  获取当前已选 (PICKING 阶段写入) 的目标时长 (分钟)
+  * @retval 用户在 PICKING 选中的目标分钟数; 0 表示尚未确认过
+  * @note   主要用于 Picker 重新打开时显示上次的非默认选择, 避免用户在
+  *         "椅子上没人" 重试流程中重复选择同样的时长。
+  */
+uint8_t State_GetTargetMinutes(void);
+
+/**
   * @brief  获取"分心"状态已持续的时间 (仅在 ST_LEARNING 累积)
   * @retval 持续毫秒数, 0 = 当前未分心 或 不在学习状态
   * @note   由 Reminder 模块调用, 用于判断"是否该弹分心提醒"
@@ -186,10 +227,10 @@ const char *State_GetMessage(uint32_t *age_ms);
 uint32_t State_GetSustainedDistract(void);
 
 /**
-  * @brief  获取"疲劳"状态已持续的时间 (仅在 ST_LEARNING 累积)
-  * @retval 持续毫秒数, 0 = 当前未疲劳 或 不在学习状态
+  * @brief  获取"玩手机"状态已持续的时间 (仅在 ST_LEARNING 累积)
+  * @retval 持续毫秒数, 0 = 当前未在玩手机 或 不在学习状态
   */
-uint32_t State_GetSustainedFatigue(void);
+uint32_t State_GetSustainedPhone(void);
 
 /**
   * @brief  获取"坐姿异常"已持续的时间 (仅在 ST_LEARNING 累积)

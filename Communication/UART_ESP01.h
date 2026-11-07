@@ -84,6 +84,9 @@ int UART_ESP01_TakeFrame(uint8_t *buf, uint16_t max_len, uint16_t *out_len);
   */
 void UART_ESP01_GetStats(uint32_t *recv, uint32_t *drop);
 
+/* 调试: 读取 IDLE 中断次数和 DMA 剩余计数 */
+void UART_ESP01_GetDebugStats(uint32_t *idle_irq, uint32_t *dma_remain);
+
 /* ============================ 发送 API ============================
  *  通道契约 (重要, 请遵守):
  *   - USART3 TX (PD8) 只用于发送"学习报告 JSON" 字节流到 ESP-01
@@ -113,6 +116,14 @@ int UART_ESP01_Send(const uint8_t *data, uint16_t len);
   *         (例如 "AT\r\n" / "JSON\n" / "raw bytes" 等)。
   */
 int UART_ESP01_SendString(const char *s);
+
+/* ============================ 低功耗唤醒辅助 ============================ */
+
+/**
+  * @brief  获取 DMA 缓冲区地址 (供 PowerManager 重启 DMA 接收)
+  * @note   从 Stop 唤醒后需要重建 DMA 状态, 需要访问缓冲区地址
+  */
+uint8_t *UART_ESP01_GetDMABuffer(void);
 
 #ifdef __cplusplus
 }

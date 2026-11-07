@@ -112,14 +112,20 @@ static uint8_t score_lower_better(float v, float ok_max, float bad_min)
   * @brief  从 AI 概率计算视觉子评分
   *
   *         映射 (每个概率在 [0,1] 范围内):
-  *             vision = focus * 100 + distract * 30 + fatigue * 0
+  *             vision = focus * 100
+  *                    + distract * 30   (短暂走神仍给部分分)
+  *                    + phone   * 0      (玩手机明确不得分)
+  *                    + empty   * 0      (无人不得分)
   *
   *         "focused" 是理想状态，"distracted" 仍给予部分分数
-  *         (短暂走神)，"fatigued" 不得分
+  *         (短暂走神)，"phone"/"empty" 不得分
   */
-static uint8_t score_vision(const float probs[3])
+static uint8_t score_vision(const float probs[4])
 {
-    float s = probs[0] * 100.0f + probs[1] * 30.0f + probs[2] * 0.0f;
+    float s = probs[0] * 100.0f    /* 专心 */
+            + probs[1] * 30.0f     /* 走神 */
+            + probs[2] * 0.0f      /* 玩手机 */
+            + probs[3] * 0.0f;     /* 无人 */
     if (s < 0.0f)   s = 0.0f;
     if (s > 100.0f) s = 100.0f;
     return (uint8_t)(s + 0.5f);
@@ -253,9 +259,12 @@ static void build_advice(FusionResult_t *r)
 
     if (who[0] == 'v')
     {
-        if (r->vision_prob_fatigue >= 0.5f)
+        if (r->vision_prob_empty >= 0.5f)
             snprintf(r->advice, sizeof(r->advice),
-                     "Looking tired - take a short break.");
+                     "No one detected - please be seated.");
+        else if (r->vision_prob_phone >= 0.5f)
+            snprintf(r->advice, sizeof(r->advice),
+                     "Phone detected - put it down to focus.");
         else if (r->vision_prob_distract >= 0.5f)
             snprintf(r->advice, sizeof(r->advice),
                      "Distraction detected - refocus on the task.");
@@ -305,11 +314,12 @@ static void debug_print(const FusionResult_t *r)
 {
     printf("\r\n========== Fusion #%lu  total=%u ==========\r\n",
            (unsigned long)r->seq, (unsigned)r->total_score);
-    printf("  vision  : %3u  (F=%.2f D=%.2f T=%.2f)  [w%d%%]\r\n",
+    printf("  vision  : %3u  (F=%.2f D=%.2f P=%.2f E=%.2f)  [w%d%%]\r\n",
            (unsigned)r->vision_score,
            (double)r->vision_prob_focus,
            (double)r->vision_prob_distract,
-           (double)r->vision_prob_fatigue,
+           (double)r->vision_prob_phone,
+           (double)r->vision_prob_empty,
            FUSION_W_VISION);
     printf("  posture : %3u  state=\"%s\" press=%.2f       [w%d%%]\r\n",
            (unsigned)r->posture_score,
@@ -371,14 +381,15 @@ void Fusion_Task(void *pvParameters)
         memset(&r, 0, sizeof(r));
 
         /* ----- 1. Vision (AITask) ------------------------------------ */
-        float probs[3] = {0.0f, 0.0f, 0.0f};
+        float probs[4] = {0.0f, 0.0f, 0.0f, 0.0f};
         if (AI_GetLatestProbs(probs, NULL) == 0)
         {
             r.flags |= FUSION_FLAG_VISION_OK;
             r.vision_score        = score_vision(probs);
-            r.vision_prob_focus   = probs[0];
-            r.vision_prob_distract= probs[1];
-            r.vision_prob_fatigue = probs[2];
+            r.vision_prob_focus   = probs[0];   /* 专心 */
+            r.vision_prob_distract= probs[1];   /* 走神 */
+            r.vision_prob_phone   = probs[2];   /* 玩手机 */
+            r.vision_prob_empty   = probs[3];   /* 无人 */
         }
         else
         {

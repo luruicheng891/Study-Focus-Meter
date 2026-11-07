@@ -107,6 +107,14 @@ int UART_ESP32_SendBytes(const uint8_t *data, uint16_t len);
   */
 int UART_ESP32_SendByte(uint8_t cmd);
 
+/* ============================ 低功耗唤醒辅助 ============================ */
+
+/**
+  * @brief  获取 DMA 缓冲区地址 (供 PowerManager 重启 DMA 接收)
+  * @note   从 Stop 唤醒后需要重建 DMA 状态, 需要访问缓冲区地址
+  */
+uint8_t *UART_ESP32_GetDMABuffer(void);
+
 #ifdef __cplusplus
 }
 #endif

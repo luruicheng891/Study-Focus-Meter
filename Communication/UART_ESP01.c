@@ -42,6 +42,7 @@ static TaskHandle_t s_rx_task = NULL;
 /* 统计 */
 static volatile uint32_t s_stat_recv = 0;
 static volatile uint32_t s_stat_drop = 0;
+static volatile uint32_t s_idle_irq_count = 0;   /* IDLE 中断总次数 (调试) */
 
 /* =========================== USART3 + DMA 初始化 =========================== */
 
@@ -156,6 +157,7 @@ void USART3_IRQ_Handler(void)
     if (__HAL_UART_GET_FLAG(&huart3, UART_FLAG_IDLE))
     {
         __HAL_UART_CLEAR_IDLEFLAG(&huart3);
+        s_idle_irq_count++;
 
         uint16_t dma_remain = (uint16_t)__HAL_DMA_GET_COUNTER(&hdma_usart3_rx);
         uint16_t recv_len   = USART3_RX_BUFFER_SIZE - dma_remain;
@@ -232,6 +234,12 @@ void UART_ESP01_GetStats(uint32_t *recv, uint32_t *drop)
     if (drop) *drop = s_stat_drop;
 }
 
+void UART_ESP01_GetDebugStats(uint32_t *idle_irq, uint32_t *dma_remain)
+{
+    if (idle_irq)   *idle_irq   = s_idle_irq_count;
+    if (dma_remain) *dma_remain = (uint32_t)__HAL_DMA_GET_COUNTER(&hdma_usart3_rx);
+}
+
 /* ============================ 发送 API ============================ */
 
 /**
@@ -255,4 +263,16 @@ int UART_ESP01_SendString(const char *s)
 {
     if (s == NULL) return -1;
     return UART_ESP01_Send((const uint8_t *)s, (uint16_t)strlen(s));
+}
+
+/* ============================ 低功耗唤醒辅助 ============================ */
+
+/**
+  * @brief  获取 DMA 缓冲区地址 (供 PowerManager 重启 DMA 接收)
+  * @note   从 Stop 唤醒后, PowerManager 需要重启 DMA 循环接收,
+  *         但不能直接访问本文件的 static 变量, 故提供此接口。
+  */
+uint8_t *UART_ESP01_GetDMABuffer(void)
+{
+    return s_dma_buf;
 }

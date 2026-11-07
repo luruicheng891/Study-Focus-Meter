@@ -40,7 +40,7 @@ typedef struct {
     uint16_t wind_x10;      /* 风速, 单位 0.1 m/s               */
     char     wdir[4];       /* 风向                             */
     uint16_t pres;          /* 气压, hPa                        */
-    char     time[8];       /* 时间字符串                       */
+    char     time[16];      /* 时间字符串 "HH:MM:SS"            */
     uint32_t timestamp;     /* 接收时刻 FreeRTOS tick           */
 } WeatherInfo_t;
 

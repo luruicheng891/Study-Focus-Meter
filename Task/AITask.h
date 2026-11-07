@@ -43,18 +43,18 @@ extern QueueHandle_t s_q_debug;    /* 供 LearningScreen 调试面板使用 */
 /**
  * @brief AI 推理结果结构 (整体写入队列, 消费者读走即是稳定副本)
  *
- * 字段顺序紧贴内存对齐, sizeof 在典型 ARM 编译器下 = 24 字节:
+ * 字段顺序紧贴内存对齐, sizeof 在典型 ARM 编译器下 = 28 字节:
  *   - seq(4) + ts_tick(4) + valid(1) + label(1) + _pad(2) = 12 字节头
- *   - probs[3]                                           = 12 字节数据
- *   - 总计 24 字节, 实际 queue item 大小 = 24
+ *   - probs[4]                                           = 16 字节数据
+ *   - 总计 28 字节, 实际 queue item 大小 = 28
  */
 typedef struct {
     uint32_t seq;            /*!< 推理序号, 每完成一次推理 +1 */
     uint32_t ts_tick;        /*!< 推理完成时刻 (FreeRTOS tick) */
     uint8_t  valid;          /*!< 1=推理成功, 0=失败 */
-    int8_t   label;          /*!< 0=focus, 1=distract, 2=fatigue, -1=err */
+    int8_t   label;          /*!< 0=focus, 1=distract, 2=phone, 3=empty, -1=err */
     uint8_t  _pad[2];        /*!< 对齐填充 */
-    float    probs[3];       /*!< [0]=专注 [1]=分心 [2]=疲劳, 范围 0.0~1.0 */
+    float    probs[4];       /*!< [0]=专注 [1]=走神 [2]=玩手机 [3]=无人, 范围 0.0~1.0 */
 } AI_Result_t;
 
 /**
@@ -96,11 +96,11 @@ int AI_WaitNewResult(AI_Result_t *out, TickType_t timeout);
  *        内部调用 AI_GetLatestResult 拿到完整结果, 再拷贝 probs 出去.
  *        给现有 FusionTask / 老代码使用.
  *
- * @param probs_out [输出] 数组[3] = {专注, 分心, 疲劳}，可为 NULL
+ * @param probs_out [输出] 数组[4] = {专注, 走神, 玩手机, 无人}，可为 NULL
  * @param ts_tick   [输出] 产生该结果的 FreeRTOS 时钟计数，可为 NULL
  * @return 0  : 有效数据已复制
  *        -1  : 尚无推理完成
  */
-int AI_GetLatestProbs(float probs_out[3], uint32_t *ts_tick);
+int AI_GetLatestProbs(float probs_out[4], uint32_t *ts_tick);
 
 #endif /* __AITASK_H */

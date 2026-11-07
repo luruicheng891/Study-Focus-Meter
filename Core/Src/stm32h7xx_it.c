@@ -95,6 +95,27 @@ extern void USART2_IRQ_Handler(void);
 extern UART_HandleTypeDef huart1;
 extern void USART1_IRQ_Handler(void);
 
+/* RTC (低功耗周期唤醒, PowerManager 使用) */
+extern RTC_HandleTypeDef hrtc;
+
+/**
+  * @brief  EXTI Line1 中断 (触摸 PEN = PB1, Stop 模式触摸唤醒源)
+  * @note   平时由 PowerManager 在进 Stop 前才使能, 醒后立即关闭。
+  *         此处只清标志, 不做业务逻辑 (真正的唤醒处理在 Power_Task 中)。
+  */
+void EXTI1_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_1);
+}
+
+/**
+  * @brief  RTC 唤醒定时器中断 (Stop 模式周期"嗅探"唤醒源)
+  */
+void RTC_WKUP_IRQHandler(void)
+{
+  HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
+}
+
 /**
   * @brief  USART1 中断 (单字节命令接收: 'C'/'W' 切换显示模式)
   */

@@ -204,11 +204,11 @@ void Reminder_Poll(void)
     /* 已经显示中, 不检查触发 */
     if (s_rem.in_use) return;
 
-    /* 触发检查 — 按优先级 (完成 > 坐姿 > 疲劳 > 分心) */
+    /* 触发检查 — 按优先级 (完成 > 坐姿 > 玩手机 > 走神) */
     uint32_t elapsed_sec = State_GetElapsedSeconds();
     uint32_t sd_ms  = State_GetSustainedDistract();
-    uint32_t sf_ms  = State_GetSustainedFatigue();
-    uint32_t sp_ms  = State_GetSustainedPosture();
+    uint32_t sp_ms  = State_GetSustainedPhone();
+    uint32_t spo_ms = State_GetSustainedPosture();
 
     /* 1. 完成 45min 庆祝 (一次性, 整轮只一次) */
     if (!s_complete_45min_fired
@@ -222,22 +222,22 @@ void Reminder_Poll(void)
     }
 
     /* 2. 持续坐姿异常 5min */
-    if (sp_ms >= REM_POSTURE_THRESHOLD_MS
+    if (spo_ms >= REM_POSTURE_THRESHOLD_MS
         && cooldown_elapsed(&s_last_posture)) {
         s_last_posture = xTaskGetTickCount();
         start_reminder("Let's adjust your posture.", REM_BG_SOFT_PINK);
         return;
     }
 
-    /* 3. 持续疲劳 5min */
-    if (sf_ms >= REM_FATIGUE_THRESHOLD_MS
+    /* 3. 持续玩手机 5min */
+    if (sp_ms >= REM_FATIGUE_THRESHOLD_MS
         && cooldown_elapsed(&s_last_fatigue)) {
         s_last_fatigue = xTaskGetTickCount();
-        start_reminder("How about a short break?", REM_BG_SOFT_ORANGE);
+        start_reminder("Please put your phone down and refocus.", REM_BG_SOFT_ORANGE);
         return;
     }
 
-    /* 4. 持续分心 2min (优先级最低, 上面三个先于它) */
+    /* 4. 持续走神 2min (优先级最低, 上面三个先于它) */
     if (sd_ms >= REM_DISTRACT_THRESHOLD_MS
         && cooldown_elapsed(&s_last_distract)) {
         s_last_distract = xTaskGetTickCount();

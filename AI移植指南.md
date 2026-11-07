@@ -12,7 +12,7 @@
 | 目标工程 | 已有 FreeRTOS + DCMI摄像头 + LVGL 显示的完整工程 |
 | AI模型工程 | 由 STM32Cube.AI (X-CUBE-AI) 生成的验证工程 |
 | 模型输入 | 32×32×1 灰度 float32，归一化 [0,1] |
-| 模型输出 | 3 类 float32 概率 |
+| 模型输出 | 4 类 float32 概率（专心/走神/玩手机/无人） |
 | 图像源 | OV2640 输出 240×240 RGB565，DCMI+DMA 采集 |
 
 ---
@@ -66,13 +66,23 @@
 #define AI_MODEL_INPUT_CHANNELS    1
 #define AI_MODEL_INPUT_ELEMENTS    (32 * 32 * 1)
 
-#define AI_MODEL_OUTPUT_CLASSES    3
-#define AI_MODEL_OUTPUT_ELEMENTS   3
+#define AI_MODEL_OUTPUT_CLASSES    4
+#define AI_MODEL_OUTPUT_ELEMENTS   4
 
-#define AI_LABEL_FOCUSED           0
-#define AI_LABEL_DISTRACTED        1
-#define AI_LABEL_FATIGUED          2
+/* ---- 标签 ---- */
+#define AI_LABEL_FOCUSED           0   /* 专心 */
+#define AI_LABEL_DISTRACTED        1   /* 走神 */
+#define AI_LABEL_PHONE             2   /* 玩手机 */
+#define AI_LABEL_EMPTY             3   /* 无人 */
+
+#define AI_LABEL_STR_FOCUSED       "Focused"
+#define AI_LABEL_STR_DISTRACTED    "Distracted"
+#define AI_LABEL_STR_PHONE         "Phone"
+#define AI_LABEL_STR_EMPTY         "Empty"
 ```
+
+> **类别顺序与模型训练时必须一致**。Cube.AI 生成的 `network_data_params.c` 中，
+> 各类别对应 softmax 输出索引 [0..3]。若调换顺序会导致所有概率标签错位。
 
 ### 3.2 推理封装 `AI/Src/ai_task.c` + `AI/Inc/ai_task.h`
 
@@ -97,6 +107,26 @@ int AI_Task_Init(void)
               AI_NETWORK_DATA_WEIGHTS_TABLE_GET());
     ...
 }
+
+// 4 类输出读取 (顺序必须与训练时一致)
+int AI_Task_InferProbs(const uint8_t gray_image[AI_MODEL_INPUT_ELEMENTS],
+                       float probs_out[AI_MODEL_OUTPUT_ELEMENTS])
+{
+    ...
+    /* Step 3: 读取输出 (4 类) */
+    float* out_data = (float*)ai_output->data;
+    probs_out[0] = out_data[0];   /* 专心 */
+    probs_out[1] = out_data[1];   /* 走神 */
+    probs_out[2] = out_data[2];   /* 玩手机 */
+    probs_out[3] = out_data[3];   /* 无人 */
+
+    /* 返回最大概率类别 */
+    int max_idx = 0;
+    for (int i = 1; i < AI_MODEL_OUTPUT_ELEMENTS; i++) {
+        if (probs_out[i] > probs_out[max_idx]) max_idx = i;
+    }
+    return max_idx;
+}
 ```
 
 ### 3.3 图像预处理 `AI/Src/ai_preprocess.c` + `AI/Inc/ai_preprocess.h`
@@ -113,6 +143,25 @@ RGB565 → 灰度 → 降采样 → float32 归一化：
 - 用 `ulTaskNotifyTake()` 等待 Camera_task 的帧通知
 - 限频 500ms 一次推理 (2fps)
 - 结果通过 printf 串口打印 + LVGL 标签显示
+- 4 类输出打包为 `AI_Result_t`（含 4 维 `probs[]` + `label` + `seq`），通过 `AI_GetLatestProbs` / `AI_GetLatestResult` 供其他任务读取
+
+### 3.5 4 类输出对工程其他模块的影响
+
+替换为 4 类模型（专心/走神/玩手机/无人）后，下游模块需同步调整：
+
+| 模块 | 修改内容 |
+|------|---------|
+| `AI/Inc/model_config.h` | `AI_MODEL_OUTPUT_*` 改为 4；新增 `AI_LABEL_PHONE` / `AI_LABEL_EMPTY` 与对应字符串 |
+| `AI/Src/ai_task.c` | `AI_Task_InferProbs` 读取 4 个概率；`AI_LabelToStr` 支持 4 个分支 |
+| `Task/AITask.h` | `AI_Result_t.probs[4]` 4 维；`AI_GetLatestProbs(float[4], ...)` |
+| `Task/FusionTask.c` | `score_vision` 用 4 维 probs 计算（专心×100 + 走神×30 + 玩手机×0 + 无人×0）；`build_advice` 按 empty / phone / distract 优先级生成建议 |
+| `Task/StateTask.c` / `.h` | `SessionSummary_t` 新增 `phone_pct`；新增 `s_phone_start_tick` 与 `State_GetSustainedPhone()` |
+| `Task/Reminder.c` | 新增"持续玩手机 5min"提醒（优先级介于坐姿与走神之间） |
+| `Task/LearningScreen.c` | 调试面板 D 行下方增加 P (Phone) 概率行；主分类结果取 4 维 argmax，染色分别对应绿/黄/橙/灰 |
+| `Task/LearningReport.c` / `.h` | 模式分布条显示 Focus / Distract / Phone 三段；`LRSessionData_t` 新增 `phone_pct` |
+
+> **重要**: 模型 softmax 输出顺序一旦与 `model_config.h` 中 `AI_LABEL_*` 不一致，
+> 概率显示就会错位。**必须**用模型训练时的 class_indices 顺序来填 0..3。
 
 ---
 
@@ -256,10 +305,15 @@ STM32-OV2640-AI/
 - [ ] 复制 `network*.c` 和 `network*.h` 到 `AI/` 目录
 - [ ] 复制 `Middlewares/ST/AI/Inc/` 所有头文件
 - [ ] 复制 `Middlewares/ST/AI/Lib/*.lib` 库文件
-- [ ] 编写 `model_config.h` (输入尺寸/标签)
-- [ ] 编写 `ai_task.c` (静态激活缓冲 + 初始化 + 推理)
+- [ ] 编写 `model_config.h` (输入尺寸/4 类标签)
+- [ ] 编写 `ai_task.c` (静态激活缓冲 + 初始化 + 4 类推理)
 - [ ] 编写 `ai_preprocess.c` (图像格式转换)
-- [ ] 编写 `AITask.c` (FreeRTOS 任务逻辑)
+- [ ] 编写 `AITask.c` (FreeRTOS 任务逻辑 + AI_Result_t 4 维 probs)
+- [ ] 同步调整 `Task/FusionTask.c` `score_vision` / `build_advice` (4 维)
+- [ ] 同步调整 `Task/StateTask.c/.h` 新增 `phone_pct` / `State_GetSustainedPhone`
+- [ ] 同步调整 `Task/Reminder.c` 新增"持续玩手机"提醒分支
+- [ ] 同步调整 `Task/LearningScreen.c` 调试面板 (4 维 argmax + P 概率行)
+- [ ] 同步调整 `Task/LearningReport.c/.h` 模式分布条 (Focus/Distract/Phone)
 - [ ] Keil 添加 Include Paths
 - [ ] Keil 添加所有 .c 源文件
 - [ ] Keil 添加 .lib 库文件
@@ -268,5 +322,26 @@ STM32-OV2640-AI/
 - [ ] 增大 AI 任务栈 (≥3072 words)
 - [ ] Camera.c 添加 xTaskNotifyGive
 - [ ] freertos.c 添加 xTaskCreate
-- [ ] 编译通过，串口确认 `[AI] Task started`
-- [ ] 确认推理结果输出
+- [ ] 编译通过，串口确认 `[AI] Model loaded successfully`
+- [ ] 确认 4 类推理结果 (Focus / Distract / Phone / Empty) 输出正确
+
+---
+
+## 十一、4 类模型替换记录 (2026-06-28)
+
+将旧的 3 类模型（专心/走神/疲劳）替换为新的 4 类模型（专心/走神/玩手机/无人），
+下游所有模块同步调整：
+
+| 类别 | 索引 | 旧 (3 类) | 新 (4 类) |
+|------|------|----------|----------|
+| 0 | Focused | 专心 | 专心 ✓ |
+| 1 | Distracted | 走神 | 走神 ✓ |
+| 2 | Phone | **疲劳** | **玩手机** ⚠ |
+| 3 | Empty | — | 无人 ⭐新增 |
+
+**关键改动**:
+- `model_config.h` 输出维度 3→4，替换 `AI_LABEL_FATIGUED` 为 `AI_LABEL_PHONE` + `AI_LABEL_EMPTY`
+- `AI_Result_t.probs[3]` → `probs[4]`，增加 `vision_prob_empty` 融合字段
+- `SessionSummary_t` 增加 `phone_pct`，UI 报告与状态机共享同一字段
+- `Reminder` 增加"持续玩手机 5 分钟"提醒，优先级：完成 > 坐姿 > 玩手机 > 走神
+- `LearningScreen` 调试面板的 T (Fatigue) 行复用为 P (Phone)；主分类染色对应：绿/黄/橙/灰

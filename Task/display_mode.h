@@ -1,7 +1,7 @@
 /**
   ******************************************************************************
   * @file    display_mode.h
-  * @brief   屏幕显示模式运行时切换 (摄像头画面 / 天气仪表板)
+  * @brief   屏幕显示模式运行时切换 (主仪表板 / 摄像头画面 / 天气预报)
   *
   *          USART1 RX 命令通道已禁用, 不再响应外部 'C'/'W' 字符.
   *          模式切换仅通过 DisplayMode_Request() API (任务上下文) 完成,
@@ -14,8 +14,9 @@
 #include <stdint.h>
 
 typedef enum {
-    DISP_MODE_CAMERA = 0,   /* 显示摄像头画面 (隐藏天气 UI) */
-    DISP_MODE_WEATHER = 1,  /* 显示天气仪表板 (隐藏摄像头) */
+    DISP_MODE_CAMERA   = 0,  /* 显示摄像头画面 */
+    DISP_MODE_WEATHER   = 1, /* 显示主仪表板 (时钟 + 室内温湿度) */
+    DISP_MODE_FORECAST  = 2, /* 显示天气预报子界面 (网络天气详情) */
 } DisplayMode_t;
 
 /* 当前显示模式 (volatile, 任务共享) */
@@ -39,5 +40,27 @@ int DisplayMode_TakePending(DisplayMode_t *out_mode);
  *        在 main.c 中, USART1_Init() 完成后调用
  */
 void DisplayMode_StartUart1Rx(void);
+
+/* ===================== 摄像头抓拍 (数据采集) ===================== */
+/**
+ * @brief 请求抓拍一帧 (由 USART1 RX 收到 'P'/'p' 命令时在 ISR 中置位)
+ * @note  也可在任务上下文手动调用 (例如触摸按钮回调)
+ */
+void DisplayMode_RequestCapture(void);
+
+/**
+ * @brief 取出并清除抓拍请求标志
+ * @retval 1 = 有抓拍请求; 0 = 无
+ * @note   由 Camera_task 主循环轮询
+ */
+int DisplayMode_TakeCaptureRequest(void);
+
+/**
+ * @brief USART1 原始字节阻塞发送 (独占 TDR, 临时冻结 printf 环形缓冲 TX)
+ *        用于把整帧图像 dump 到上位机, 期间会 taskYIELD 让出 CPU.
+ * @param data 待发送数据
+ * @param len  字节数
+ */
+void USART1_SendRaw_Blocking(const uint8_t *data, uint32_t len);
 
 #endif

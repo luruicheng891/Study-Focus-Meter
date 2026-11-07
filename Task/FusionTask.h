@@ -64,9 +64,10 @@ typedef struct
     uint8_t  env_noise_score;
 
     /* 用于 UI / 调试的原始数据 */
-    float    vision_prob_focus;     /* AI 输出的 "专注" 概率             */
-    float    vision_prob_distract;  /* AI 输出的 "分心" 概率             */
-    float    vision_prob_fatigue;   /* AI 输出的 "疲劳" 概率             */
+    float    vision_prob_focus;     /* AI 输出的 "专心" 概率             */
+    float    vision_prob_distract;  /* AI 输出的 "走神" 概率             */
+    float    vision_prob_phone;     /* AI 输出的 "玩手机" 概率           */
+    float    vision_prob_empty;     /* AI 输出的 "无人" 概率             */
     char     posture_state[16];     /* 从机状态字符串                    */
     float    pressure;              /* 从机压力值                       */
     int32_t  temperature_c100;      /* 温度，单位 0.01 C                */

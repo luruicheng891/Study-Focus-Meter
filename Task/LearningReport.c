@@ -62,7 +62,7 @@ extern const lv_font_t lv_font_montserrat_20;
 #define LR_DATA_HILITE     lv_color_hex(0x6B4A2A)   /* deep sandalwood (darker, high contrast) */
 #define LR_MODE_FOCUS      lv_color_hex(0x7A5F3A)   /* mode bar: focus (darker gold) */
 #define LR_MODE_DISTRACT   lv_color_hex(0x5C5852)   /* mode bar: distract (darker mid gray) */
-#define LR_MODE_FATIGUE    lv_color_hex(0x1A1815)   /* mode bar: fatigue (near-black) */
+#define LR_MODE_PHONE      lv_color_hex(0x1A1815)   /* mode bar: phone (near-black) */
 #define LR_TRACK           lv_color_hex(0xB5AE9F)   /* mode bar track (visible) */
 #define LR_BANNER_BG       lv_color_hex(0xE5DDCB)   /* end-mode banner background */
 
@@ -91,7 +91,7 @@ extern const lv_font_t lv_font_montserrat_20;
 /* ======================== Default demo values (used only at Init) ======================== */
 #define LR_DEFAULT_FOCUS     65
 #define LR_DEFAULT_DISTRACT  20
-#define LR_DEFAULT_FATIGUE   15
+#define LR_DEFAULT_PHONE     15
 
 /* ======================== Static styles (initialized once) ======================== */
 static lv_style_t st_screen;        /* screen: vertical gradient bg */
@@ -125,8 +125,8 @@ static lv_obj_t *lr_lbl_focus  = NULL;
 static lv_obj_t *lr_bar_track  = NULL;   /* full-width track behind */
 static lv_obj_t *lr_bar_focus  = NULL;   /* focus segment */
 static lv_obj_t *lr_bar_dist   = NULL;   /* distract segment */
-static lv_obj_t *lr_bar_fat    = NULL;   /* fatigue segment */
-static lv_obj_t *lr_lbl_modes  = NULL;   /* "Focus 75%  Distract 15%  Fatigue 10%" */
+static lv_obj_t *lr_bar_fat    = NULL;   /* phone segment (reuse var name) */
+static lv_obj_t *lr_lbl_modes  = NULL;   /* "Focus 75%  Distract 15%  Phone 10%" */
 
 /* End mode banner */
 static lv_obj_t *lr_end_banner  = NULL;
@@ -436,10 +436,10 @@ static void lr_create_hero(void)
 }
 
 /**
- * @brief Create the mode distribution bar (Focus / Distract / Fatigue)
+ * @brief Create the mode distribution bar (Focus / Distract / Phone)
  *        Layout:
  *          y=112  full-width track (14px), segments grow on top of it
- *          y=130  combined percentage label "Focus 75%  Distract 15%  Fatigue 10%"
+ *          y=130  combined percentage label "Focus 75%  Distract 15%  Phone 10%"
  *        Bar widths are set to 0 in the builder; LearningReport_Update()
  *        animates them to the real values.
  */
@@ -449,7 +449,7 @@ static void lr_create_mode_bar(void)
 
     /* Combined mode label (initially "0% 0% 0%"; updated by LearningReport_Update) */
     lr_lbl_modes = lv_label_create(lr_screen);
-    lv_label_set_text(lr_lbl_modes, "Focus 0%  Distract 0%  Fatigue 0%");
+    lv_label_set_text(lr_lbl_modes, "Focus 0%  Distract 0%  Phone 0%");
     lv_obj_add_style(lr_lbl_modes, &st_section_lbl, 0);
     lv_obj_set_pos(lr_lbl_modes, LR_SIDE_PAD, LR_BAR_LBL_Y);
 
@@ -473,21 +473,21 @@ static void lr_create_mode_bar(void)
     lv_obj_add_style(lr_bar_dist, &st_bar_seg, 0);
     lv_obj_set_style_bg_color(lr_bar_dist, LR_MODE_DISTRACT, 0);
 
-    /* Fatigue segment - to the right of distract */
+    /* Phone segment - to the right of distract (reuse lr_bar_fat var) */
     lr_bar_fat = lv_obj_create(lr_screen);
     lv_obj_set_size(lr_bar_fat, 0, LR_BAR_H);
     lv_obj_set_pos(lr_bar_fat, LR_SIDE_PAD, LR_BAR_Y);
     lv_obj_add_style(lr_bar_fat, &st_bar_seg, 0);
-    lv_obj_set_style_bg_color(lr_bar_fat, LR_MODE_FATIGUE, 0);
+    lv_obj_set_style_bg_color(lr_bar_fat, LR_MODE_PHONE, 0);
 
     /* Demo: animate default bar at init time (overridden by Update on ST_SUMMARY) */
     const lv_coord_t def_focus_w = bar_w * LR_DEFAULT_FOCUS / 100;
     const lv_coord_t def_dist_w  = bar_w * LR_DEFAULT_DISTRACT / 100;
-    const lv_coord_t def_fat_w   = bar_w * LR_DEFAULT_FATIGUE / 100;
+    const lv_coord_t def_phone_w = bar_w * LR_DEFAULT_PHONE / 100;
 
     lr_anim_width(lr_bar_focus, 0, def_focus_w, 250);
     lr_anim_width(lr_bar_dist,  0, def_dist_w,  250);
-    lr_anim_width(lr_bar_fat,   0, def_fat_w,   250);
+    lr_anim_width(lr_bar_fat,   0, def_phone_w, 250);
 }
 
 /**
@@ -594,7 +594,7 @@ static void lr_fmt_duration(uint32_t sec, char *buf, size_t sz)
  * @brief Push real session data into the screen
  * @param data session data pointer (see LRSessionData_t)
  * @note  Updates all displayed data fields and animates the mode bar to the
- *        new focus/distract/fatigue ratio.  Safe to call on a NULL pointer
+ *        new focus/distract/phone ratio.  Safe to call on a NULL pointer
  *        (it will display zeros without crashing).
  */
 void LearningReport_Update(const LRSessionData_t *data)
@@ -607,7 +607,7 @@ void LearningReport_Update(const LRSessionData_t *data)
     uint8_t  avg_score = data ? data->avg_total_score : 0;
     uint8_t  focus     = data ? data->focus_pct       : 0;
     uint8_t  distract  = data ? data->distract_pct    : 0;
-    uint8_t  fatigue   = data ? data->fatigue_pct     : 0;
+    uint8_t  phone     = data ? data->phone_pct       : 0;
     uint8_t  auto_end  = data ? data->auto_ended      : 0;
 
     char buf[24];
@@ -644,28 +644,28 @@ void LearningReport_Update(const LRSessionData_t *data)
     const lv_coord_t bar_w   = LR_SCR_W - LR_SIDE_PAD * 2;
     const lv_coord_t seg_f_w = bar_w * focus    / 100;
     const lv_coord_t seg_d_w = bar_w * distract / 100;
-    const lv_coord_t seg_a_w = bar_w * fatigue  / 100;
+    const lv_coord_t seg_p_w = bar_w * phone    / 100;
 
-    /* Position distract right after focus, fatigue right after distract */
+    /* Position distract right after focus, phone right after distract */
     if (lr_bar_dist) lv_obj_set_x(lr_bar_dist, LR_SIDE_PAD + seg_f_w);
     if (lr_bar_fat)  lv_obj_set_x(lr_bar_fat,  LR_SIDE_PAD + seg_f_w + seg_d_w);
 
     /* Animate widths from 0 -> target */
     lr_anim_width(lr_bar_focus, 0, seg_f_w, 200);
     lr_anim_width(lr_bar_dist,  0, seg_d_w, 200);
-    lr_anim_width(lr_bar_fat,   0, seg_a_w, 200);
+    lr_anim_width(lr_bar_fat,   0, seg_p_w, 200);
 
-    /* Combined mode label (under the bar): "Focus 75%  Distract 15%  Fatigue 10%" */
+    /* Combined mode label (under the bar): "Focus 75%  Distract 15%  Phone 10%" */
     if (lr_lbl_modes) {
-        lv_label_set_text_fmt(lr_lbl_modes, "Focus %u%%  Distract %u%%  Fatigue %u%%",
-                              (unsigned)focus, (unsigned)distract, (unsigned)fatigue);
+        lv_label_set_text_fmt(lr_lbl_modes, "Focus %u%%  Distract %u%%  Phone %u%%",
+                              (unsigned)focus, (unsigned)distract, (unsigned)phone);
     }
 
     /* End mode banner text */
     if (lr_lbl_end) {
         const char *end_str = "End: Manual";
         switch (auto_end) {
-        case 1:  end_str = "End: Auto (5min away)"; break;
+        case 1:  end_str = "End: Auto (3min away)"; break;
         case 2:  end_str = "End: Time Complete!";   break;
         default: end_str = "End: Manual";            break;
         }

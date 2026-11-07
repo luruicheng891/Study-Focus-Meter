@@ -24,11 +24,19 @@
 #include <stdarg.h>
 #include <string.h>
 
+/* ============================ 编译开关 ============================ */
+/* 数据采集构建: 置 1 重新使能 USART1 RX, 收到 'P'/'p' 抓拍一帧.
+ * 正式量产构建可置 0, 恢复"关闭 RX 防悬空噪声"的行为. */
+#define CAM_CAPTURE_RX_ENABLE   1
+
 /* ============================ 状态变量 ============================ */
 volatile DisplayMode_t g_display_mode = DISP_MODE_CAMERA;
 
 static volatile DisplayMode_t s_pending_mode = DISP_MODE_CAMERA;
 static volatile uint8_t       s_pending_flag = 0;
+
+/* 抓拍请求标志 (ISR 置位, Camera_task 轮询清除) */
+static volatile uint8_t       s_capture_flag = 0;
 
 /* ============================ TX 环形缓冲 ============================ */
 #define TX_RING_SIZE   2048   /* 2KB, 应付突发的 print_weather_info 等大块输出 */
@@ -104,6 +112,59 @@ int DisplayMode_TakePending(DisplayMode_t *out_mode)
     return has;
 }
 
+/* ============================ 抓拍 API ============================ */
+
+void DisplayMode_RequestCapture(void)
+{
+    s_capture_flag = 1;
+}
+
+int DisplayMode_TakeCaptureRequest(void)
+{
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    int has = s_capture_flag;
+    s_capture_flag = 0;
+    if(!primask) __enable_irq();
+    return has;
+}
+
+/**
+ * @brief USART1 原始字节阻塞发送 — 独占 TDR, 把整帧图像 dump 到上位机
+ * @note  1) 临时关闭 TXE 中断, 防止 printf 环形缓冲与帧数据交织;
+ *        2) 逐字节轮询 TXE, 忙等时 taskYIELD 让出 CPU 给同/高优先级任务;
+ *        3) 发完等 TC, 再视情况恢复 TXE 让残留 printf 继续.
+ *        FIFO 模式已在 USART1_Init 中关闭, 这里按单字节 TXE 处理.
+ */
+void USART1_SendRaw_Blocking(const uint8_t *data, uint32_t len)
+{
+    if(data == NULL || len == 0) return;
+
+    /* 冻结环形缓冲 TX 中断, 独占 TDR */
+    USART1->CR1 &= ~USART_CR1_TXEIE_TXFNFIE;
+
+    for(uint32_t i = 0; i < len; i++)
+    {
+        uint32_t guard = 0;
+        /* 等待 TDR 空 (H7 FIFO 位名 TXE_TXFNF) */
+        while(!(USART1->ISR & USART_ISR_TXE_TXFNF))
+        {
+            if((++guard & 0x3FF) == 0) {
+                taskYIELD();   /* 忙等期间让出 CPU, 避免饿死同优先级任务 */
+            }
+        }
+        USART1->TDR = data[i];
+    }
+
+    /* 等待最后一字节移位完成 */
+    while(!(USART1->ISR & USART_ISR_TC)) { }
+
+    /* 环形缓冲里若还有未发的 printf 数据, 重新使能 TXE 让 ISR 接管 */
+    if(tx_head != tx_tail) {
+        USART1->CR1 |= USART_CR1_TXEIE_TXFNFIE;
+    }
+}
+
 static void process_rx_byte(uint8_t b)
 {
     /* USART1 RX 命令通道已禁用, 此函数保留为占位, 不再被调用. */
@@ -118,10 +179,15 @@ static void process_rx_byte(uint8_t b)
  */
 void DisplayMode_StartUart1Rx(void)
 {
-    /* 只使能 NVIC, 让 TXE 中断能进入 CPU (printf 环形缓冲依赖此中断)
-     * RXNEIE 保持 0 (HAL_UART_Init 默认不使能), 噪声不会触发中断 */
     HAL_NVIC_SetPriority(USART1_IRQn, 6, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
+
+#if CAM_CAPTURE_RX_ENABLE
+    /* 数据采集构建: 使能 RX, 收到 'P'/'p' 触发抓拍.
+     * 采集时上位机串口已接好, RX 被驱动, 不存在悬空噪声;
+     * 即便误收一字节, 最多多 dump 一帧, 无副作用. */
+    USART1->CR1 |= USART_CR1_RXNEIE_RXFNEIE;
+#endif
 }
 
 /* ============================ USART1 IRQ ============================ */
@@ -149,6 +215,17 @@ void USART1_IRQ_Handler(void)
             u->CR1 &= ~USART_CR1_TXEIE_TXFNFIE;
         }
     }
+
+#if CAM_CAPTURE_RX_ENABLE
+    /* === RX (RXNE_RXFNE): 单字节命令, 'P'/'p' 请求抓拍一帧 === */
+    if((isr & USART_ISR_RXNE_RXFNE) && (cr1 & USART_CR1_RXNEIE_RXFNEIE))
+    {
+        uint8_t b = (uint8_t)(u->RDR & 0xFF);   /* 读 RDR 自动清 RXNE */
+        if(b == 'P' || b == 'p') {
+            s_capture_flag = 1;
+        }
+    }
+#endif
 
     /* === 错误清除 === */
     if(isr & (USART_ISR_ORE | USART_ISR_FE | USART_ISR_NE | USART_ISR_PE))

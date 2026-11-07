@@ -282,7 +282,7 @@ static void lv_draw_stm32_dma2d_img_decoded(lv_draw_ctx_t * draw_ctx, const lv_d
 
 static lv_point_t lv_area_get_offset(const lv_area_t * area1, const lv_area_t * area2)
 {
-    lv_point_t offset = {x: area2->x1 - area1->x1, y: area2->y1 - area1->y1};
+    lv_point_t offset = {.x = area2->x1 - area1->x1, .y = area2->y1 - area1->y1};
     return offset;
 }
 

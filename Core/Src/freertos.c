@@ -23,6 +23,7 @@
 #include "display_mode.h"
 #include "lvgl.h"
 #include "TouchTask.h"
+#include "PowerManager.h"
 
 /* Private variables ---------------------------------------------------------*/
 
@@ -67,6 +68,10 @@ void MX_FREERTOS_Init(void)
 
     /* 状态机任务: 200ms 周期, 监听压力/GUI 事件, 驱动 IDLE/LEARNING/AWAY/PAUSED/SUMMARY 转移 */
     xTaskCreate(State_Task, "State_Task", 512, NULL, osPriorityNormal, NULL);
+
+    /* 低功耗管理任务: 空闲态息屏后进 Stop 模式, 触摸 PEN(EXTI1)/RTC 周期唤醒
+     * 优先级高于业务任务, 便于在大家都空闲时抢到 CPU 执行 Stop 进入序列 */
+    xTaskCreate(Power_Task, "Power_Task", 256, NULL, osPriorityHigh, NULL);
 }
 
 /**

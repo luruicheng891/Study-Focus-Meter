@@ -12,13 +12,13 @@
   *
   *          布局 (320x240):
   *            y=0..14   顶部极简状态条 (状态/时间/摄像头缩略图)
-  *            y=24..176 中央: 双环 (外=进度 / 内=专注) + 大字时间 + 目标
+  *            y=24..176 中央: 外环 (倒计时进度) + 48pt 大字倒计时 + 目标
   *            y=180..208 环境信息卡 (温度/湿度/光照) — 极淡
   *            y=210..222 噪音波形 — 安静时近静态
   *            y=224..240 极小控制按钮 (Pause/End) — 暗灰不抢眼
   *
-  *          颜色: 专注环默认柔绿, 仅在持续异常 5min+ 才缓慢变色
-  *                (不被模型瞬时 Distract 结果左右, 体现"陪伴")
+  *          时间: 中央 48pt 倒计时 "MM:SS" (从 30min 倒数到 0)
+  *                外环显示剩余比例 (从满到空); 用户偶尔瞥一眼, 故用最大字号
   ******************************************************************************
   */
 
@@ -29,6 +29,7 @@
 #include "FusionTask.h"       /* FusionResult_t, 调试面板用 (posture/score) */
 #include "SlaveRxTask.h"      /* SlaveData_t, Slave_GetLatest — 调试面板原始分数/压力 */
 #include "AITask.h"           /* AI_GetLatestProbs — 调试面板必须用实时, 不走 Fusion */
+// #include "bg_img.h"           /* 背景图已移除 (省 ~150KB Flash) */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "lvgl.h"
@@ -39,10 +40,10 @@
 
 /* ======================== 字体定义 ========================
  * lv_conf.h 启用了 montserrat_12/14/16/18/20/28/48
- *   时间大字 28pt — 醒目但不刺眼
+ *   时间大字 48pt — 倒计时, 一眼看清
  *   14pt  — 调试面板分类结果
  *   小字  12pt  — 顶部/环境/按钮/调试细节 */
-#define FONT_TIME       &lv_font_montserrat_28
+#define FONT_TIME       &lv_font_montserrat_48   /* 倒计时大字 — 一眼看清 */
 #define FONT_MID        &lv_font_montserrat_14
 #define FONT_SMALL      &lv_font_montserrat_12
 
@@ -71,15 +72,39 @@
 #define LR_TRACK        lv_color_hex(0x222A3A)   /* 圆环轨道 (暗) */
 #define LR_TRACK_SOFT   lv_color_hex(0x2A3346)   /* 圆环轨道 (稍亮) */
 
+/* ======================== 背景状态色 ========================
+ * 给整屏底色一个"此刻状态"氛围提示 (替代固定 LR_BG_DEEP), 作为
+ * 采集(视觉+姿态) -> 计算 -> 反馈 闭环的最后一环。
+ *
+ * 关键设计原则: 背景色只反映用户当下能通过调整行为直接影响的信号——
+ * 只用 vision_score(视觉专注度) + posture_score(坐姿), 按 FusionTask 中
+ * 二者的原始权重比例 (40:30) 重新归一化为 focus_score (0..100)。
+ *
+ * 不使用 FusionResult_t.total_score, 因为它还混入了 env(环境) 和
+ * duration(学习时长) 两项——这两项用户在"此刻"无法通过调整坐姿/专注度
+ * 去改变或纠正, 混进实时反馈会让背景变色和用户行为的因果关系错配,
+ * 闭环无法闭合 (例如: 坐姿端正+视觉专注, 但因为学太久 duration_score
+ * 走低, 背景却变黄, 用户会觉得"我做对了却被判不专注")。
+ * env/duration 更适合放进 SUMMARY 报告做整体建议, 不在这里体现。
+ *
+ *   ST_AWAY (从机压力消失 >=30s, StateTask 自动判定)     -> 暗红, 提示"无人"
+ *   ST_LEARNING 且 focus_score >= LR_FOCUS_SCORE_TH      -> 暗蓝, 提示"专注"
+ *   ST_LEARNING 且 focus_score <  LR_FOCUS_SCORE_TH      -> 暗黄, 提示"不专注"
+ *   其余状态 (PAUSED 等)                                  -> 默认深色 LR_BG_DEEP
+ * 全部用低亮度色调 (仅做底色氛围), 不影响白色文字对比度. */
+#define LR_FOCUS_SCORE_TH   60      /* focus_score 门限: >= 为专注(蓝), < 为不专注(黄) */
+#define LR_FOCUS_STREAK_TH  5       /* 连续 N 次同向才切换背景色 (避免 1Hz 抖动) */
+
+#define LR_BG_FOCUS      lv_color_hex(0x102244)   /* 暗蓝 — 专注 */
+#define LR_BG_DISTRACT   lv_color_hex(0xFF0000)   /* 暗红 — 不专注 */
+#define LR_BG_AWAY       lv_color_hex(0xFF0000)   /* 暗红 — 无人 */
+
 /* ======================== 动画时长 ======================== */
-#define LR_BREATH_PERIOD_MS    2000   /* 呼吸: 2s 一周期 (1s 正 + 1s 反) */
-#define LR_COLOR_FADE_MS       2500   /* 状态色平滑过渡: 2.5s */
 #define LR_PROGRESS_FILL_MS    3000   /* 进度环填充: 3s */
+#define LR_BG_TRANSITION_MS    1500   /* 背景色渐变过渡: 1.5s, 避免突变刺眼 */
 
 /* ======================== 几何参数 ======================== */
-#define LR_FOCUS_RADIUS        58     /* 专注环半径 */
 #define LR_PROGRESS_RADIUS     74     /* 进度环半径 (外) */
-#define LR_RING_WIDTH          3      /* 圆环线宽 (细, 优雅) */
 #define LR_RING_WIDTH_OUT      2      /* 外环线宽 (更细) */
 
 /* 圆环中心 */
@@ -97,9 +122,8 @@ static lv_obj_t *lr_label_clock    = NULL;  /* 时钟 */
 static lv_obj_t *lr_label_wifi     = NULL;  /* WiFi 状态 */
 static lv_obj_t *lr_cam_thumb      = NULL;  /* 摄像头缩略图 */
 
-/* 双环 */
-static lv_obj_t *lr_arc_focus      = NULL;  /* 内: 专注度 (呼吸) */
-static lv_obj_t *lr_arc_progress   = NULL;  /* 外: 学习进度 (慢填充) */
+/* 进度环 (倒计时剩余比例) */
+static lv_obj_t *lr_arc_progress   = NULL;  /* 外环: 学习进度 */
 
 /* 噪音波形 */
 #define LR_WAVE_POINTS  48
@@ -121,24 +145,30 @@ static lv_obj_t *lr_btn_pause     = NULL;
 static lv_obj_t *lr_btn_end       = NULL;
 static lv_obj_t *lr_pause_lbl     = NULL;
 
-/* 调试面板 (可切换) — 左侧滑出, 显示 AI 模型原始结果 */
+/* 调试面板 (可切换) — 左侧滑出, 显示 AI 分类结果 + 当前评分 + 从机压力值 */
 static lv_obj_t *lr_btn_dbg       = NULL;   /* 顶部 DBG 按钮 */
 static lv_obj_t *lr_dbg_panel     = NULL;   /* 调试面板容器 */
 static uint8_t   lr_dbg_visible   = 0;      /* 0=隐藏, 1=显示 */
 static lv_obj_t *lr_dbg_lbl_ai    = NULL;   /* "AI" 标题 */
 static lv_obj_t *lr_dbg_lbl_class = NULL;   /* ">> Focus" 主分类结果 */
-static lv_obj_t *lr_dbg_lbl_f     = NULL;   /* F: 85% */
-static lv_obj_t *lr_dbg_lbl_d     = NULL;   /* D: 10% */
-static lv_obj_t *lr_dbg_lbl_t     = NULL;   /* T:  5% */
-static lv_obj_t *lr_dbg_lbl_s     = NULL;   /* S: 85 */
-static lv_obj_t *lr_dbg_lbl_v     = NULL;   /* V: 80 */
-static lv_obj_t *lr_dbg_lbl_p     = NULL;   /* P: normal */
-static lv_obj_t *lr_dbg_lbl_po    = NULL;   /* Po: 77  (从机原始姿态分数) */
-static lv_obj_t *lr_dbg_lbl_pr    = NULL;   /* Pr: 0.0 (从机原始压力值) */
-static lv_obj_t *lr_dbg_lbl_seq   = NULL;   /* #123 */
+static lv_obj_t *lr_dbg_lbl_score = NULL;   /* Sc: 88 (融合后当前评分) */
+static lv_obj_t *lr_dbg_lbl_pr    = NULL;   /* Pr: 0.0 (从机压力值) */
 
 /* 内部状态 */
 static uint32_t lr_last_elapsed_sec = 0;
+
+/* 背景状态色: 记录当前已应用的分类, 避免重复设置同一颜色 (0=默认深色,
+ * 1=专注蓝, 2=不专注黄, 3=无人红), 首次进入时强制刷新一次 */
+static int8_t   lr_bg_state = -1;
+/* 去抖计数: 在 ST_LEARNING 下, 连续 LR_FOCUS_STREAK_TH 次同向
+ * (>=TH 算专注, <TH 算不专注) 才允许切换分类。方向相反时计数清零。
+ * -1 = 无累计方向 (状态切换/初始时清零) */
+static int8_t   lr_focus_streak_dir = -1;
+static uint8_t  lr_focus_streak_cnt = 0;
+/* 最近一次"此刻专注分" (UpdateFusion 写入, 只含视觉+姿态, 见下方
+ * lr_calc_focus_score), UpdateStatus 在状态切换瞬间 (此时可能还没有
+ * 新的 Fusion 帧) 复用该值判断专注/不专注分类 */
+static uint8_t  lr_last_focus_score = 0;
 
 /* ======================== 内部小工具 ======================== */
 static lv_obj_t *lr_make_label(lv_obj_t *parent, const char *txt,
@@ -153,59 +183,114 @@ static lv_obj_t *lr_make_label(lv_obj_t *parent, const char *txt,
     return l;
 }
 
-/* ======================== 专注环呼吸动画 (2s 周期) ======================== */
-static void lr_breath_anim_cb(void *obj, int32_t v)
+/* ======================== 背景状态色渐变 ========================
+ * 复用 lv_anim (与进度环相同套路), 用混色因子 0..255 在
+ * lr_bg_anim_from_color -> lr_bg_anim_to_color 间平滑过渡,
+ * 避免整屏底色突变刺眼 (符合"数值变化平滑"设计原则)。 */
+/* lv_color_hex() 是内联函数非常量表达式, 不能用作全局初始值;
+ * 统一在 LearningScreen_Init() 中赋值为 LR_BG_DEEP */
+static lv_color_t lr_bg_current_color;
+static lv_color_t lr_bg_anim_from_color;
+static lv_color_t lr_bg_anim_to_color;
+
+static void lr_bg_anim_exec_cb(void *obj, int32_t v)
 {
-    /* v: 0..100 → 不透明度 60~100, 线宽 2~4 (轻柔) */
-    lv_opa_t opa = (lv_opa_t)(LV_OPA_60 + (v * (LV_OPA_100 - LV_OPA_60) / 100));
-    lv_obj_set_style_arc_opa((lv_obj_t *)obj, opa, LV_PART_INDICATOR);
-    int32_t w = 2 + (v * 2 / 100);
-    lv_obj_set_style_arc_width((lv_obj_t *)obj, (uint16_t)w, LV_PART_INDICATOR);
+    lv_color_t c = lv_color_mix(lr_bg_anim_to_color, lr_bg_anim_from_color, (lv_opa_t)v);
+    lv_obj_set_style_bg_color((lv_obj_t *)obj, c, 0);
 }
 
-static void lr_start_breath_anim(lv_obj_t *arc)
+static void lr_bg_anim_ready_cb(lv_anim_t *a)
 {
-    /* play 1s + playback 1s = 2s 一周期 */
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, arc);
-    lv_anim_set_exec_cb(&a, lr_breath_anim_cb);
-    lv_anim_set_values(&a, 0, 100);
-    lv_anim_set_time(&a, LR_BREATH_PERIOD_MS / 2);
-    lv_anim_set_playback_time(&a, LR_BREATH_PERIOD_MS / 2);
-    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_start(&a);
+    LV_UNUSED(a);
+    lr_bg_current_color = lr_bg_anim_to_color;
 }
 
-/* ======================== 颜色平滑过渡 (2.5s) ======================== */
-static lv_color_t lr_focus_cur_color = {0};
-static lv_obj_t  *lr_focus_anim_obj  = NULL;
-static lv_color_t s_anim_start;
-static lv_color_t s_anim_target;
-
-static void lr_arc_color_anim_cb(void *obj, int32_t v)
+static void lr_bg_animate_to(lv_color_t target)
 {
-    lv_color_t mix = lv_color_mix(s_anim_start, s_anim_target, (uint16_t)v);
-    lv_obj_set_style_arc_color((lv_obj_t *)obj, mix, LV_PART_INDICATOR);
-}
-
-static void lr_focus_fade_to(lv_color_t target)
-{
-    if (lr_focus_anim_obj == NULL) return;
-    if (lv_color_to32(lr_focus_cur_color) == lv_color_to32(target)) return;
-
-    s_anim_start  = lr_focus_cur_color;
-    s_anim_target = target;
+    if (lr_screen == NULL) return;
+    lr_bg_anim_from_color = lr_bg_current_color;
+    lr_bg_anim_to_color   = target;
 
     lv_anim_t a;
     lv_anim_init(&a);
-    lv_anim_set_var(&a, lr_focus_anim_obj);
-    lv_anim_set_exec_cb(&a, lr_arc_color_anim_cb);
+    lv_anim_set_var(&a, lr_screen);
+    lv_anim_set_exec_cb(&a, lr_bg_anim_exec_cb);
     lv_anim_set_values(&a, 0, 255);
-    lv_anim_set_time(&a, LR_COLOR_FADE_MS);
+    lv_anim_set_time(&a, LR_BG_TRANSITION_MS);
+    lv_anim_set_ready_cb(&a, lr_bg_anim_ready_cb);
     lv_anim_start(&a);
+}
 
-    lr_focus_cur_color = target;
+/* 从融合结果中提出"此刻专注分" — 只用 vision_score + posture_score,
+ * 按 FusionTask 中二者的原始权重比例 (40:30) 归一化到 0..100:
+ *   focus_score = (vision*40 + posture*30) / 70
+ * 不含 env_score / duration_score (用户此刻无法通过调整行为改变这两项,
+ * 混入会让背景反馈和用户行为的因果关系错配, 详见上方设计说明)。 */
+static uint8_t lr_calc_focus_score(const FusionResult_t *f)
+{
+    if (!f) return 0;
+    uint32_t weighted = (uint32_t)f->vision_score  * FUSION_W_VISION
+                       + (uint32_t)f->posture_score * FUSION_W_POSTURE;
+    uint32_t denom     = FUSION_W_VISION + FUSION_W_POSTURE;   /* = 70 */
+    return (uint8_t)((weighted + denom / 2) / denom);
+}
+
+/* 依据当前学习状态机状态 + "此刻专注分" (仅视觉+姿态), 决定背景颜色
+ * 分类并触发渐变:
+ *   0 = 默认深色 — 非 LEARNING/AWAY (PICKING/PAUSED/SUMMARY 等)
+ *   1 = 专注(蓝) — ST_LEARNING 且 focus_score >= LR_FOCUS_SCORE_TH
+ *   2 = 不专注(黄) — ST_LEARNING 且 focus_score <  LR_FOCUS_SCORE_TH
+ *   3 = 无人(红) — ST_AWAY (从机压力消失 >=30s, StateTask 已自动判定, 优先级最高)
+ * 由 LearningScreen_UpdateFusion() 每次收到新融合结果 (1Hz) 时调用。
+ * 加入"连续 N 次同向"去抖: 避免评分在阈值附近抖动时背景色频繁切换。
+ * - ST_AWAY  / 其他状态: 立即切换 (状态本身有边沿, 不需要去抖)
+ * - ST_LEARNING:        连续 LR_FOCUS_STREAK_TH 次同向才切换
+ * 相同分类不重复触发动画。 */
+static void lr_bg_update(uint8_t focus_score)
+{
+    if (lr_screen == NULL) return;
+
+    LearningState_t s = State_GetCurrent();
+    int8_t     new_state;
+    lv_color_t target;
+
+    if (s == ST_AWAY) {
+        /* AWAY 是状态切换, 立即应用, 并清零 LEARNING 的去抖计数 */
+        new_state = 3;
+        target    = LR_BG_AWAY;
+        lr_focus_streak_dir = -1;
+        lr_focus_streak_cnt = 0;
+    } else if (s == ST_LEARNING) {
+        /* 本帧的"提议分类": 1=专注, 2=不专注 */
+        int8_t proposed = (focus_score >= LR_FOCUS_SCORE_TH) ? 1 : 2;
+
+        if (proposed == lr_focus_streak_dir) {
+            if (lr_focus_streak_cnt < 255) lr_focus_streak_cnt++;
+        } else {
+            lr_focus_streak_dir = proposed;
+            lr_focus_streak_cnt = 1;
+        }
+
+        /* 必须连续 LR_FOCUS_STREAK_TH 次同向, 且与当前显示分类不同, 才切换 */
+        if (lr_focus_streak_cnt >= LR_FOCUS_STREAK_TH
+            && proposed != lr_bg_state) {
+            new_state = proposed;
+            target    = (proposed == 1) ? LR_BG_FOCUS : LR_BG_DISTRACT;
+        } else {
+            /* 未达到阈值, 维持当前显示 (包括 lr_bg_state 还未设过的 -1) */
+            return;
+        }
+    } else {
+        /* PAUSED 等其他状态: 立即恢复默认深色, 清零去抖 */
+        new_state = 0;
+        target    = LR_BG_DEEP;
+        lr_focus_streak_dir = -1;
+        lr_focus_streak_cnt = 0;
+    }
+
+    if (new_state == lr_bg_state) return;  /* 分类未变, 不重复触发 */
+    lr_bg_state = new_state;
+    lr_bg_animate_to(target);
 }
 
 /* ======================== 进度环填充 (3s 慢) ======================== */
@@ -379,28 +464,22 @@ static void lr_end_btn_event_cb(lv_event_t *e)
 
 /* ======================== 调试面板 ========================
  *
- *  位置: 屏幕左侧, x=4, y=14, w=80, h=178
+ *  位置: 屏幕左侧, x=4, y=14, w=80, h=115
  *  默认隐藏; 点击顶部 "DBG" 按钮展开
  *
- *  内容 (14pt 分类结果 + 12pt 细节):
+ *  内容 (14pt 分类结果 + 12pt 细节) — 仅显示 AI 识别结果 + 从机压力值:
  *
  *    AI Model
  *    >> Focus         ← 主分类结果 (14pt, 跟随概率最大类染色)
  *    ────────
  *    F: 85.2%         ← 专注概率 (绿)
  *    D: 10.1%         ← 分心概率 (黄)
- *    T:  4.7%         ← 疲劳概率 (橙)
+ *    P:  4.7%         ← 玩手机概率 (橙)
  *    ────────
- *    S:  85           ← 综合分
- *    V:  80           ← 视觉子分
- *    P: normal        ← 坐姿状态 (融合)
- *    Po:  77          ← 从机刚收到的原始姿态分数
  *    Pr: 0.0          ← 从机刚收到的原始压力值
- *    #1234            ← 帧序号
  *
  *  颜色用降饱和色, 仍与主界面气质一致.
- *  w=80 不与中央外环 (x=86) 重叠; 作为调试浮层, 底部略压住环境卡 (y=184),
- *  仅在开发者点击 DBG 时出现, 可接受.
+ *  w=80 不与中央外环 (x=86) 重叠; 作为调试浮层, 仅在开发者点击 DBG 时出现.
  */
 static lv_obj_t *lr_dbg_make_line(lv_obj_t *parent, const char *txt,
                                   int x, int y, lv_color_t color,
@@ -418,9 +497,9 @@ static lv_obj_t *lr_dbg_make_line(lv_obj_t *parent, const char *txt,
 
 static void lr_dbg_build(void)
 {
-    /* 面板底 (圆角暗卡) */
+    /* 面板底 (圆角暗卡) — 高度从 178 缩到 115, 只显示 AI 结果 + 压力 */
     lr_dbg_panel = lv_obj_create(lr_screen);
-    lv_obj_set_size(lr_dbg_panel, 80, 178);
+    lv_obj_set_size(lr_dbg_panel, 80, 115);
     lv_obj_set_pos(lr_dbg_panel, 4, 14);
     lv_obj_set_style_bg_color(lr_dbg_panel, LR_BG_PANEL, 0);
     lv_obj_set_style_bg_opa(lr_dbg_panel, LV_OPA_80, 0);
@@ -435,17 +514,15 @@ static void lr_dbg_build(void)
      *   y=2   标题 (12pt)
      *   y=15  class (14pt, 结束 y=33)
      *   y=35  divider 1
-     *   y=45  F
-     *   y=58  D
-     *   y=71  T
-     *   y=84  divider 2
-     *   y=94  S  (融合总分)
-     *   y=107 V  (视觉子分)
-     *   y=120 P  (坐姿状态字符串)
-     *   y=133 Po (从机原始姿态分数)
-     *   y=146 Pr (从机原始压力值)
-     *   y=159 #seq
-     *  末行结束 y=171, 面板高 178 刚好容纳.
+     *   y=45  Sc (当前融合评分, 0..100)
+     *   y=58  divider 2
+     *   y=68  Pr (从机原始压力值)
+     *  末行结束 y=82, 面板高 115 留 33px 底部留白.
+     *
+     *  不再显示: F / D / P 概率 (主分类 >> 已能看出 AI 倾向,
+     *           逐项百分比对调试价值低) + S (融合总分) +
+     *           V (视觉子分) + Po (从机姿态分) + #seq (AI 帧号).
+     *  新增: Sc (FusionResult_t.total_score, 0..100, 含视觉+姿态+环境+时长).
      */
 
     /* 标题 */
@@ -460,35 +537,17 @@ static void lr_dbg_build(void)
     lr_dbg_make_line(lr_dbg_panel, "-------", 6, 35,
                      LR_FG_DIM, FONT_SMALL, NULL);
 
-    /* F / D / T 概率 */
-    lr_dbg_make_line(lr_dbg_panel, "F: --", 6, 45,
-                     LR_GREEN_SOFT, FONT_SMALL, &lr_dbg_lbl_f);
-    lr_dbg_make_line(lr_dbg_panel, "D: --", 6, 58,
-                     LR_YELLOW_SOFT, FONT_SMALL, &lr_dbg_lbl_d);
-    lr_dbg_make_line(lr_dbg_panel, "T: --", 6, 71,
-                     LR_ORANGE_SOFT, FONT_SMALL, &lr_dbg_lbl_t);
+    /* Sc: 当前融合评分 (FusionResult_t.total_score, 0..100) */
+    lr_dbg_make_line(lr_dbg_panel, "Sc: --", 6, 45,
+                     LR_GREEN_SOFT, FONT_SMALL, &lr_dbg_lbl_score);
 
     /* 分隔线 2 */
-    lr_dbg_make_line(lr_dbg_panel, "-------", 6, 84,
+    lr_dbg_make_line(lr_dbg_panel, "-------", 6, 58,
                      LR_FG_DIM, FONT_SMALL, NULL);
 
-    /* S 总分 / V 视觉分 / P 坐姿状态 */
-    lr_dbg_make_line(lr_dbg_panel, "S: --", 6, 94,
-                     LR_FG_SOFT, FONT_SMALL, &lr_dbg_lbl_s);
-    lr_dbg_make_line(lr_dbg_panel, "V: --", 6, 107,
-                     LR_FG_MID, FONT_SMALL, &lr_dbg_lbl_v);
-    lr_dbg_make_line(lr_dbg_panel, "P: --", 6, 120,
-                     LR_FG_MID, FONT_SMALL, &lr_dbg_lbl_p);
-
-    /* 从机 (ESP32) 刚接收到的原始分数 / 压力值 */
-    lr_dbg_make_line(lr_dbg_panel, "Po: --", 6, 133,
-                     LR_PROG_TEAL, FONT_SMALL, &lr_dbg_lbl_po);
-    lr_dbg_make_line(lr_dbg_panel, "Pr: --", 6, 146,
+    /* 从机 (ESP32) 刚接收到的压力值 (仅此一项) */
+    lr_dbg_make_line(lr_dbg_panel, "Pr: --", 6, 68,
                      LR_PROG_CYAN, FONT_SMALL, &lr_dbg_lbl_pr);
-
-    /* #帧号 */
-    lr_dbg_make_line(lr_dbg_panel, "#0",   6, 159,
-                     LR_FG_DIM, FONT_SMALL, &lr_dbg_lbl_seq);
 
     /* 默认隐藏 */
     lv_obj_add_flag(lr_dbg_panel, LV_OBJ_FLAG_HIDDEN);
@@ -525,6 +584,16 @@ void LearningScreen_Init(void)
     lv_obj_set_style_pad_all(lr_screen, 0, 0);
     lv_obj_clear_flag(lr_screen, LV_OBJ_FLAG_SCROLLABLE);
 
+    /* 背景状态色初始值: 默认深色, 分类标记复位为"未设置" */
+    lr_bg_current_color   = LR_BG_DEEP;
+    lr_bg_anim_from_color = LR_BG_DEEP;
+    lr_bg_anim_to_color   = LR_BG_DEEP;
+    lr_bg_state           = -1;
+    /* 评分去抖计数: 每次进入学习屏重置, 避免上次会话的累计影响 */
+    lr_focus_streak_dir   = -1;
+    lr_focus_streak_cnt   = 0;
+
+    /* 背景图已移除 (省 ~150KB Flash), 屏幕深色底 (LR_BG_DEEP) 作为兜底 */
     /* ==================== 顶部极小状态条 (y=0..14) ==================== */
     /* 左侧: 状态 (学习圆点 + 文字) */
     lv_obj_t *state_dot = lv_obj_create(lr_screen);
@@ -577,7 +646,7 @@ void LearningScreen_Init(void)
                    (lv_coord_t)(LR_CENTER_X - LR_PROGRESS_RADIUS),
                    (lv_coord_t)(LR_CENTER_Y - LR_PROGRESS_RADIUS));
     lv_arc_set_range(lr_arc_progress, 0, 100);
-    lv_arc_set_value(lr_arc_progress, 0);
+    lv_arc_set_value(lr_arc_progress, 100);   /* 倒计时: 初始满, 随时间变空 */
     lv_arc_set_rotation(lr_arc_progress, 135);
     lv_arc_set_bg_angles(lr_arc_progress, 0, 270);
     /* 轨道 (极暗) */
@@ -591,52 +660,25 @@ void LearningScreen_Init(void)
     lv_obj_set_style_arc_opa(lr_arc_progress, LV_OPA_70, LV_PART_INDICATOR);
     lv_obj_clear_flag(lr_arc_progress, LV_OBJ_FLAG_CLICKABLE);
 
-    /* ==================== 内环: 专注度 (呼吸) ====================
-     * 中心 (160, 105), 半径 58, 跨 270°
-     * 默认柔绿, 启动呼吸 */
-    lr_arc_focus = lv_arc_create(lr_screen);
-    lv_obj_set_size(lr_arc_focus,
-                    (lv_coord_t)(LR_FOCUS_RADIUS * 2),
-                    (lv_coord_t)(LR_FOCUS_RADIUS * 2));
-    lv_obj_set_pos(lr_arc_focus,
-                   (lv_coord_t)(LR_CENTER_X - LR_FOCUS_RADIUS),
-                   (lv_coord_t)(LR_CENTER_Y - LR_FOCUS_RADIUS));
-    lv_arc_set_range(lr_arc_focus, 0, 100);
-    lv_arc_set_value(lr_arc_focus, 100);
-    lv_arc_set_rotation(lr_arc_focus, 135);
-    lv_arc_set_bg_angles(lr_arc_focus, 0, 270);
-    /* 轨道 (暗) */
-    lv_obj_set_style_arc_color(lr_arc_focus, LR_TRACK_SOFT, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(lr_arc_focus, LR_RING_WIDTH, LV_PART_MAIN);
-    lv_obj_set_style_arc_opa(lr_arc_focus, LV_OPA_60, LV_PART_MAIN);
-    /* 指示器 — 柔绿, 启动呼吸 */
-    lv_obj_set_style_arc_color(lr_arc_focus, LR_GREEN_SOFT, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(lr_arc_focus, LR_RING_WIDTH, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_rounded(lr_arc_focus, true, LV_PART_INDICATOR);
-    lv_obj_clear_flag(lr_arc_focus, LV_OBJ_FLAG_CLICKABLE);
-
-    lr_focus_cur_color = LR_GREEN_SOFT;
-    lr_focus_anim_obj  = lr_arc_focus;
-    lr_start_breath_anim(lr_arc_focus);
-
-    /* ==================== 中央时间 (大字, 现代化排版) ====================
-     * 居中, 28pt 柔白
-     * 上方 28pt 时间 (m:ss 格式), 下方 12pt 目标分钟数 */
+    /* ==================== 中央倒计时大字 (48pt, 一眼看清) ====================
+     * 外环内径约 140px, 48pt "MM:SS" 约 130px 宽, 居中放下.
+     * 用户偶尔瞥一眼, 故用最大可用字号突出剩余时间. */
     lr_label_time = lv_label_create(lr_screen);
-    lv_label_set_text(lr_label_time, "0:00");
+    lv_label_set_text(lr_label_time, "30:00");
     lv_obj_set_style_text_font(lr_label_time, FONT_TIME, 0);
     lv_obj_set_style_text_color(lr_label_time, LR_FG_SOFT, 0);
-    lv_obj_set_width(lr_label_time, 110);
+    lv_obj_set_width(lr_label_time, 160);
     lv_obj_set_style_text_align(lr_label_time, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(lr_label_time, LR_CENTER_X - 55, LR_CENTER_Y - 22);
+    lv_obj_set_pos(lr_label_time, LR_CENTER_X - 80, LR_CENTER_Y - 28);
 
+    /* 目标提示 (12pt 暗灰, 倒计时下方) */
     lr_label_target = lv_label_create(lr_screen);
-    lv_label_set_text(lr_label_target, "0 / 30 min");
+    lv_label_set_text(lr_label_target, "剩余 30 min");
     lv_obj_set_style_text_font(lr_label_target, FONT_SMALL, 0);
     lv_obj_set_style_text_color(lr_label_target, LR_FG_DIM, 0);
-    lv_obj_set_width(lr_label_target, 110);
+    lv_obj_set_width(lr_label_target, 160);
     lv_obj_set_style_text_align(lr_label_target, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(lr_label_target, LR_CENTER_X - 55, LR_CENTER_Y + 14);
+    lv_obj_set_pos(lr_label_target, LR_CENTER_X - 80, LR_CENTER_Y + 34);
 
     /* ==================== 环境信息卡 (y=184..206) ==================== */
     lr_env_build();
@@ -750,23 +792,11 @@ void LearningScreen_UpdateStatus(void)
         }
     }
 
-    /* ===== 圆环颜色根据持续状态平滑过渡 =====
-     * 关键: 阈值拉长 (5min+), 不被模型瞬时 Distract 状态左右
-     * 体现"陪伴" — 默认柔绿, 严重异常才缓慢变暖色 */
-    uint32_t sp_ms = State_GetSustainedPosture();
-    uint32_t sf_ms = State_GetSustainedFatigue();
-    uint32_t sd_ms = State_GetSustainedDistract();
+    /* ===== 圆环颜色根据持续状态平滑过渡 ===== (已移除: 内环呼吸环删除后不再变色) */
 
-    lv_color_t target_color = LR_GREEN_SOFT;
-    if (sp_ms >= 5UL * 60UL * 1000UL) {
-        target_color = LR_PINK_SOFT;        /* 坐姿异常 5min+ */
-    } else if (sf_ms >= 5UL * 60UL * 1000UL) {
-        target_color = LR_ORANGE_SOFT;      /* 疲劳 5min+ */
-    } else if (sd_ms >= 5UL * 60UL * 1000UL) {
-        /* 分心阈值也拉到 5min, 模型误报不会触发 */
-        target_color = LR_YELLOW_SOFT;
-    }
-    lr_focus_fade_to(target_color);
+    /* ===== 整屏底色: 依据状态 (+ 最近一次专注分) 切换 专注蓝/不专注黄/无人红 =====
+     * 状态切换瞬间 (例如刚进入 ST_AWAY) 立即刷新一次, 不等下一帧 Fusion 结果 */
+    lr_bg_update(lr_last_focus_score);
 }
 
 /* 室内数据更新 — 推波形 + 更新环境卡 */
@@ -786,10 +816,9 @@ void LearningScreen_UpdateSensor(const SensorData_t *d)
     lr_env_update(d);
 }
 
-/* 中央大时间更新
- *   < 60s   -> "0:SS"
- *   >= 60s  -> "M"
- *   同时驱动学习进度环 (按目标时长占比)
+/* 中央倒计时大字更新
+ *   显示剩余时间 "MM:SS" (从 30min 目标倒数到 0)
+ *   同时驱动外环进度 (剩余比例, 从满到空)
  *   数据源: StateTask 累加器 (PAUSED/AWAY 时自动冻结) */
 void LearningScreen_UpdateStopwatch(void)
 {
@@ -799,31 +828,29 @@ void LearningScreen_UpdateStopwatch(void)
     if (sec == lr_last_elapsed_sec) return;
     lr_last_elapsed_sec = sec;
 
+    /* 目标时长取自 StateTask (用户在 Picker 选择的值), 保证与选择同步。
+     * 若无目标 (0), 回退到默认 30min 仅用于显示, 避免除 0。 */
+    uint32_t tgt = State_GetTargetSeconds();
+    if (tgt == 0) tgt = 30UL * 60UL;
+
+    /* 倒计时: 剩余 = 目标 - 已用 (clamp >= 0) */
+    uint32_t remain = (sec < tgt) ? (tgt - sec) : 0;
+    uint32_t mm = remain / 60;
+    uint32_t ss = remain % 60;
+
     char buf[24];
-    if (sec < 60) {
-        snprintf(buf, sizeof(buf), "0:%02lu", (unsigned long)sec);
-    } else {
-        uint32_t minutes = sec / 60;
-        snprintf(buf, sizeof(buf), "%lu", (unsigned long)minutes);
-    }
+    snprintf(buf, sizeof(buf), "%lu:%02lu", (unsigned long)mm, (unsigned long)ss);
     lv_label_set_text(lr_label_time, buf);
 
-    /* 目标提示: "M / 30 min" */
+    /* 目标提示: "剩余 X min" (剩余分钟, 基于用户选择的目标计算) */
     if (lr_label_target) {
-        LearningState_t s = State_GetCurrent();
-        if (s == ST_LEARNING || s == ST_PAUSED || s == ST_AWAY) {
-            uint32_t minutes = sec / 60;
-            snprintf(buf, sizeof(buf), "%lu / 30 min", (unsigned long)minutes);
-        } else {
-            snprintf(buf, sizeof(buf), "0 / 30 min");
-        }
+        snprintf(buf, sizeof(buf), "剩余 %lu min", (unsigned long)mm);
         lv_label_set_text(lr_label_target, buf);
     }
 
-    /* 进度环: 按 30min 假目标 */
+    /* 进度环: 显示剩余比例 (从满到空, 倒计时直觉) */
     {
-        const uint32_t tgt = 30UL * 60UL;
-        uint32_t pct = (sec * 100UL) / tgt;
+        uint32_t pct = (remain * 100UL) / tgt;
         if (pct > 100) pct = 100;
         lr_progress_anim_to((int32_t)pct);
     }
@@ -854,12 +881,14 @@ void LearningScreen_RefreshBar(void)
 }
 
 /* ======================== 调试面板更新 ========================
- * 把 AI 推理的实时结果 + 融合数据 推送到调试面板.
+ * 把 AI 推理的实时结果 + 从机压力值 推送到调试面板.
  * 由 DisplayTask 在每次融合结果更新时调用.
  *
- * 关键: F / D / T 概率必须从 AITask 实时取, 不可走 FusionTask
- *       (Fusion 1Hz 轮询, 滞后 0~1s, 与 Picker 屏幕显示不一致)
- *       评分 / 坐姿 从 FusionResult_t 取 (1Hz 足够, 这些数据变化慢)
+ * 关键: AI 概率 (用于主分类 >>) 必须从 AITask 实时取, 不可走 FusionTask
+ *       (Fusion 1Hz 轮询, 滞后 0~1s, 与 Picker 屏幕显示不一致).
+ *       调试面板仅显示: AI 主分类 + 当前融合评分 Sc + 从机压力 Pr.
+ *       焦点分数 lr_last_focus_score 仍从 FusionResult_t 计算,
+ *       用于驱动整屏底色 (非调试面板).
  */
 void LearningScreen_UpdateFusion(const FusionResult_t *f)
 {
@@ -867,41 +896,37 @@ void LearningScreen_UpdateFusion(const FusionResult_t *f)
 
     char buf[24];
 
-    /* ===== F / D / T 概率: 走 AITask 实时通道 ===== */
-    float probs[3] = {0.0f, 0.0f, 0.0f};
+    /* ===== F / D / P / E 概率: 走 AITask 实时通道 =====
+     * 4 类: 专心 / 走神 / 玩手机 / 无人 */
+    float probs[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     uint32_t ai_ts = 0;
     int ai_valid = (AI_GetLatestProbs(probs, &ai_ts) == 0);
 
-    int f_pct = 0, d_pct = 0, t_pct = 0;
+    int f_pct = 0, d_pct = 0, p_pct = 0, e_pct = 0;
     if (ai_valid) {
         f_pct = (int)(probs[0] * 1000.0f + 0.5f);  // 0.0~1.0 → 0~1000
         d_pct = (int)(probs[1] * 1000.0f + 0.5f);
-        t_pct = (int)(probs[2] * 1000.0f + 0.5f);
+        p_pct = (int)(probs[2] * 1000.0f + 0.5f);  // 玩手机
+        e_pct = (int)(probs[3] * 1000.0f + 0.5f);  // 无人
         if (f_pct > 1000) f_pct = 1000; if (f_pct < 0) f_pct = 0;
         if (d_pct > 1000) d_pct = 1000; if (d_pct < 0) d_pct = 0;
-        if (t_pct > 1000) t_pct = 1000; if (t_pct < 0) t_pct = 0;
+        if (p_pct > 1000) p_pct = 1000; if (p_pct < 0) p_pct = 0;
+        if (e_pct > 1000) e_pct = 1000; if (e_pct < 0) e_pct = 0;
     }
 
-    if (lr_dbg_lbl_f) {
-        if (ai_valid) snprintf(buf, sizeof(buf), "F:%3d.%d%%", f_pct / 10, f_pct % 10);
-        else          snprintf(buf, sizeof(buf), "F: --");
-        lv_label_set_text(lr_dbg_lbl_f, buf);
-    }
-    if (lr_dbg_lbl_d) {
-        if (ai_valid) snprintf(buf, sizeof(buf), "D:%3d.%d%%", d_pct / 10, d_pct % 10);
-        else          snprintf(buf, sizeof(buf), "D: --");
-        lv_label_set_text(lr_dbg_lbl_d, buf);
-    }
-    if (lr_dbg_lbl_t) {
-        if (ai_valid) snprintf(buf, sizeof(buf), "T:%3d.%d%%", t_pct / 10, t_pct % 10);
-        else          snprintf(buf, sizeof(buf), "T: --");
-        lv_label_set_text(lr_dbg_lbl_t, buf);
+    /* ===== Sc: 当前融合评分 (FusionResult_t.total_score, 0..100) =====
+     * 取自本函数入参 f, 实时反映本次融合结果 (不再单独从 AITask 取, 因为
+     * 调试面板只展示"经过融合后给用户看的分数", 跟进度环、底色一致)。 */
+    if (lr_dbg_lbl_score) {
+        if (f) snprintf(buf, sizeof(buf), "Sc:%3u", (unsigned)f->total_score);
+        else   snprintf(buf, sizeof(buf), "Sc: --");
+        lv_label_set_text(lr_dbg_lbl_score, buf);
     }
 
-    /* ===== 主分类结果 (取 3 个概率中的最大者) =====
-     * 平局时按优先级: F > D > T
+    /* ===== 主分类结果 (取 4 个概率中的最大者) =====
+     * 平局时按优先级: F > D > P > E
      * 用相应颜色染色, 一目了然
-     * 类名取短以适配 14pt 字体: Focus / Distract / Tired */
+     * 类名取短以适配 14pt 字体: Focus / Distract / Phone / Empty */
     if (lr_dbg_lbl_class) {
         if (!ai_valid) {
             lv_label_set_text(lr_dbg_lbl_class, ">> ---");
@@ -909,7 +934,8 @@ void LearningScreen_UpdateFusion(const FusionResult_t *f)
         } else {
             int max_pct = f_pct;
             if (d_pct > max_pct) max_pct = d_pct;
-            if (t_pct > max_pct) max_pct = t_pct;
+            if (p_pct > max_pct) max_pct = p_pct;
+            if (e_pct > max_pct) max_pct = e_pct;
 
             const char *class_name;
             lv_color_t  class_color;
@@ -917,8 +943,10 @@ void LearningScreen_UpdateFusion(const FusionResult_t *f)
                 class_name = "Focus";     class_color = LR_GREEN_SOFT;
             } else if (max_pct == d_pct) {
                 class_name = "Distract";  class_color = LR_YELLOW_SOFT;
+            } else if (max_pct == p_pct) {
+                class_name = "Phone";     class_color = LR_ORANGE_SOFT;
             } else {
-                class_name = "Tired";     class_color = LR_ORANGE_SOFT;
+                class_name = "Empty";     class_color = LR_FG_DIM;
             }
 
             snprintf(buf, sizeof(buf), ">> %s", class_name);
@@ -927,51 +955,26 @@ void LearningScreen_UpdateFusion(const FusionResult_t *f)
         }
     }
 
-    /* ===== S / V / P 走 Fusion (1Hz 足够, 这些数据变化慢) ===== */
-    if (f) {
-        snprintf(buf, sizeof(buf), "S:%3d", f->total_score);
-        if (lr_dbg_lbl_s) lv_label_set_text(lr_dbg_lbl_s, buf);
-
-        snprintf(buf, sizeof(buf), "V:%3d", f->vision_score);
-        if (lr_dbg_lbl_v) lv_label_set_text(lr_dbg_lbl_v, buf);
-
-        /* P 坐姿状态 (字符串来自从机, 截前 8 字符防溢出) */
-        char p_buf[12];
-        strncpy(p_buf, f->posture_state, sizeof(p_buf) - 1);
-        p_buf[sizeof(p_buf) - 1] = '\0';
-        snprintf(buf, sizeof(buf), "P:%.8s", p_buf);
-        if (lr_dbg_lbl_p) lv_label_set_text(lr_dbg_lbl_p, buf);
-    }
-
-    /* ===== Po / Pr: 从机 (ESP32) 刚接收到的原始姿态分数 + 压力值 =====
+    /* ===== Pr: 从机 (ESP32) 刚接收到的原始压力值 =====
      * 直接走 Slave_GetLatest 取最新一帧, 不经融合, 反映"刚收到"的值。
-     * 无数据时显示 "--" 占位。 */
+     * 无数据时显示 "--" 占位。
+     * 调试面板仅保留此一项从机数据, 其它姿态分等已隐藏。 */
     {
         SlaveData_t sd;
         if (Slave_GetLatest(&sd) == 0) {
-            snprintf(buf, sizeof(buf), "Po:%3ld", (long)sd.score);
-            if (lr_dbg_lbl_po) lv_label_set_text(lr_dbg_lbl_po, buf);
-
             snprintf(buf, sizeof(buf), "Pr:%.1f", (double)sd.pressure);
             if (lr_dbg_lbl_pr) lv_label_set_text(lr_dbg_lbl_pr, buf);
         } else {
-            if (lr_dbg_lbl_po) lv_label_set_text(lr_dbg_lbl_po, "Po: --");
             if (lr_dbg_lbl_pr) lv_label_set_text(lr_dbg_lbl_pr, "Pr: --");
         }
     }
 
-    /* ===== 帧号: 用 AI_Result_t.seq (真实推理序号, 每完成一次推理 +1) =====
-     * 这样能直接看到 AI 是否在跑 (数字应稳定增长, 不会回退)
-     * 通过 AI_GetLatestResult 拿完整结果, 而非包装的 AI_GetLatestProbs
-     * (后者不带 seq 信息) */
-    if (lr_dbg_lbl_seq) {
-        AI_Result_t ai_full;
-        if (AI_GetLatestResult(&ai_full) == 0) {
-            /* 真实 seq, mod 10000 显示 4 位数 */
-            snprintf(buf, sizeof(buf), "#%04lu", (unsigned long)(ai_full.seq % 10000u));
-        } else {
-            snprintf(buf, sizeof(buf), "#----");
-        }
-        lv_label_set_text(lr_dbg_lbl_seq, buf);
+    /* ===== 计算"此刻专注分", 驱动整屏底色 (非调试面板) =====
+     * 注意: lr_last_focus_score 仍需更新, 否则 LearningScreen_UpdateStatus
+     * 复用旧值导致整屏底色卡在初始色。
+     * lr_calc_focus_score 走 FusionResult_t (含视觉+姿态, 不被扣分影响)。 */
+    if (f) {
+        lr_last_focus_score = lr_calc_focus_score(f);
+        lr_bg_update(lr_last_focus_score);
     }
 }
